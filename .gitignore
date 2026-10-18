@@ -1,0 +1,4 @@
+build/
+assets/person/
+__pycache__/
+*.pt

@@ -1,0 +1,79 @@
+# のび太君の家 (野比家) 1 階の間取り。
+# 出典: LIFULL HOME'S「ドラえもん・野比家の間取り」(https://www.homes.co.jp/cont/living/living_00324/) の
+#      2005 年以降の間取り図 (村上洋一「野比家の製作」に転載されたもので寸法を読み取った)。
+# 図の居間 8 畳を 3.64m 四方として縮尺を決め、半間 (0.91m) 単位に丸めた。
+# この縮尺で 1 階 約 63m² + 2 階 約 21m² ≒ 記事の推定床面積 83.83m² と一致する。
+# 座標: 建物の南西の角が原点、x が東、y が北 [m]。図の上を北とした (玄関が南)。
+#
+# このファイルから scripts/build_house.py が Gazebo のワールドと Nav2 の地図を作る (二重管理しない)。
+# 2 階 (のび太の部屋) はロボットが階段を上れないので作らない (IoT 機器だけで見守る)。
+
+name: nobita
+wall_thickness: 0.12
+wall_height: 2.4
+
+# 壁: 線分 [x1, y1, x2, y2] (縦か横)。gaps は扉などの開口 (線分の向きの座標の範囲)
+walls:
+  # 外壁
+  - {seg: [0.0, 0.0, 3.64, 0.0]}                          # 応接室 南
+  - {seg: [3.64, 0.0, 5.46, 0.0]}                         # 玄関の扉 (閉じている)
+  - {seg: [0.0, 0.0, 0.0, 7.28]}                          # 応接室・居間 西
+  - {seg: [0.0, 7.28, 0.91, 7.28]}
+  - {seg: [0.91, 7.28, 0.91, 10.92]}                      # DK 西
+  - {seg: [0.91, 10.92, 5.46, 10.92]}                     # DK 北
+  - {seg: [5.46, 7.28, 5.46, 10.92]}                      # DK 東 (勝手口は閉じている)
+  - {seg: [5.46, 7.28, 7.28, 7.28]}                       # 浴室 北
+  - {seg: [7.28, 2.73, 7.28, 7.28]}                       # 水回り 東
+  - {seg: [5.46, 2.73, 7.28, 2.73]}                       # トイレ 南
+  - {seg: [5.46, 0.0, 5.46, 2.73]}                        # 玄関 東
+  # 内壁
+  - {seg: [0.0, 2.73, 3.64, 2.73]}                        # 応接室 / 居間
+  - {seg: [3.64, 0.0, 3.64, 7.28], gaps: [[1.75, 2.60], [2.80, 3.60]]}   # 廊下 西 (応接室・居間の扉)
+  - {seg: [0.91, 7.28, 4.55, 7.28]}                       # 居間・階段 / DK (廊下の上は DK へ開いている)
+  - {seg: [5.46, 2.73, 5.46, 7.28], gaps: [[2.85, 3.50], [3.85, 4.75]]}  # 廊下 東 (トイレ・洗面所の扉)
+  - {seg: [5.46, 3.64, 7.28, 3.64]}                       # トイレ / 洗面所
+  - {seg: [5.46, 5.46, 7.28, 5.46], gaps: [[5.85, 6.65]]} # 洗面所 / 浴室
+
+# 床の仕上げ [xmin, xmax, ymin, ymax]
+floors:
+  - {name: ousetsu, rect: [0.0, 3.64, 0.0, 2.73], material: wood}
+  - {name: ima, rect: [0.0, 3.64, 2.73, 7.28], material: tatami}
+  - {name: rouka, rect: [3.64, 5.46, 1.27, 7.28], material: wood}
+  - {name: genkan, rect: [3.64, 5.46, 0.0, 1.27], material: tile}
+  - {name: dk, rect: [0.91, 5.46, 7.28, 10.92], material: wood}
+  - {name: sanitary, rect: [5.46, 7.28, 2.73, 7.28], material: tile}
+
+# 家具 (床から高さ height の直方体。LiDAR にも地図にも同じ形で写る)
+furniture:
+  # 居間 (8 畳の和室)
+  - {name: oshiire, rect: [1.82, 3.58, 6.37, 7.22], height: 1.8, color: paper}      # 押入
+  - {name: butsudan, rect: [0.06, 0.91, 6.47, 7.22], height: 1.2, color: dark}      # 仏壇
+  - {name: tokonoma, rect: [0.91, 1.82, 6.47, 7.22], height: 0.15, color: wood}     # 床の間
+  - {name: chabudai, rect: [1.35, 2.25, 4.15, 5.05], height: 0.33, color: wood}     # ちゃぶ台
+  - {name: tv_stand, rect: [1.5, 2.6, 2.79, 3.15], height: 0.5, color: dark}
+  # 応接室
+  - {name: sofa, rect: [0.9, 2.7, 2.0, 2.65], height: 0.75, color: sofa}
+  - {name: center_table, rect: [1.2, 2.4, 1.1, 1.7], height: 0.4, color: wood}
+  - {name: armchair_l, rect: [1.0, 1.6, 0.1, 0.75], height: 0.75, color: sofa}
+  - {name: armchair_r, rect: [1.9, 2.5, 0.1, 0.75], height: 0.75, color: sofa}
+  # DK
+  - {name: kitchen, rect: [1.0, 4.2, 10.3, 10.86], height: 0.85, color: white}
+  - {name: fridge, rect: [4.6, 5.4, 10.15, 10.86], height: 1.8, color: white}
+  - {name: dining_table, rect: [2.1, 3.1, 8.3, 9.6], height: 0.7, color: wood}
+  - {name: sideboard, rect: [1.0, 3.0, 7.34, 7.8], height: 0.8, color: wood}
+  # 階段 (上れないので箱として置く。下の端 y=3.64 が上り口)
+  - {name: stairs, rect: [3.64, 4.55, 3.64, 7.28], height: 1.2, color: wood}
+  # 水回り
+  - {name: bathtub, rect: [5.9, 7.2, 5.85, 7.2], height: 0.55, color: white}
+  - {name: washbasin, rect: [6.6, 7.2, 4.6, 5.35], height: 0.85, color: white}
+  - {name: washer, rect: [6.6, 7.2, 3.7, 4.4], height: 0.9, color: white}
+  - {name: toilet, rect: [6.6, 7.15, 2.85, 3.5], height: 0.4, color: white}
+
+# 地図だけに入れる進入禁止 (玄関の土間との段差。ロボットは降りられない)
+keepout:
+  - [3.64, 5.46, 1.20, 1.30]
+
+# 敷地 (見た目だけ。扉は閉じているのでロボットは出ない)
+site:
+  rect: [-4.0, 9.0, -3.0, 13.0]   # ブロック塀の内側
+  gate: [3.8, 5.3]                 # 南の塀の門 (x の範囲)
