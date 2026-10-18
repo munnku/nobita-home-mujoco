@@ -2,3 +2,5 @@ build/
 assets/person/
 __pycache__/
 *.pt
+third_party/
+.venv/

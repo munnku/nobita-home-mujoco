@@ -11,7 +11,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "sim"))
 from scene import compose  # noqa: E402
 
-os.environ.setdefault("MUJOCO_GL", "egl")
+if sys.platform.startswith("linux"):
+    os.environ.setdefault("MUJOCO_GL", "egl")  # Docker の中は画面なしで描く
 out = os.path.join(ROOT, "build", "spike")
 os.makedirs(out, exist_ok=True)
 
@@ -25,7 +26,7 @@ data.qpos[qa + 2] = 0.125
 mujoco.mj_forward(model, data)
 
 from ultralytics import YOLO  # noqa: E402
-yolo = YOLO("yolov8s.pt")
+yolo = YOLO(os.path.join(ROOT, "third_party", "yolov8s.pt"))
 r = mujoco.Renderer(model, 480, 640)
 for cam in ["head_camera", "cam_ima", "cam_ousetsu", "cam_dk", "cam_rouka"]:
     t = time.time()

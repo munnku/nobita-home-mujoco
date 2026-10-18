@@ -14,7 +14,8 @@ import numpy as np
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "sim"))
-os.environ.setdefault("MUJOCO_GL", "egl")
+if sys.platform.startswith("linux"):
+    os.environ.setdefault("MUJOCO_GL", "egl")  # Docker の中は画面なしで描く
 from scene import compose  # noqa: E402
 from duck import Duck  # noqa: E402
 from ultralytics import YOLO  # noqa: E402
@@ -25,7 +26,7 @@ spec = compose(os.path.join(ROOT, "houses", "nobita"), duck=(0, 0, 0),
 duck = Duck(spec, policy=os.environ.get("POLICY", "alpha_walking"))
 duck.reset(2.9, 3.4, math.pi / 2)
 m, d = duck.model, duck.data
-yolo = YOLO("yolov8s.pt")
+yolo = YOLO(os.path.join(ROOT, "third_party", "yolov8s.pt"))
 head = mujoco.Renderer(m, 240, 320)
 chase = mujoco.Renderer(m, 480, 640)
 cam = mujoco.MjvCamera()

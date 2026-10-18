@@ -1,0 +1,26 @@
+[project]
+name = "nobita-home"
+version = "0.1.0"
+description = "のび太君の家を IoT とロボット (Microduck) で見守る — MuJoCo シミュレーション"
+requires-python = ">=3.12, <3.13"
+dependencies = [
+    "mujoco==3.10.0",
+    "onnxruntime>=1.24",
+    "numpy>=2.0",
+    "pyyaml>=6.0",
+    "pillow>=10.0",
+    "opencv-python>=4.10",
+    "paho-mqtt>=2.1",
+    "trimesh>=4.5",
+    "pycollada>=0.9",
+    "scipy>=1.14",
+    # Microduck のサーボのモデル (microduck_rl が使っているのと同じ版)
+    "better-actuator-models",
+    "ultralytics>=8.3",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+better-actuator-models = { git = "https://github.com/Rhoban/bam.git", rev = "62bd8ce12154340be97e06f7f41a0ca8f116d967" }

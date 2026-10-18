@@ -53,12 +53,12 @@ def euler_to_xyaxes(roll, pitch, yaw):
 
 
 def build(house_dir, ceiling=False):
-    with open(os.path.join(house_dir, "layout.yaml")) as f:
+    with open(os.path.join(house_dir, "layout.yaml"), encoding="utf-8") as f:
         lay = yaml.safe_load(f)
     cams = {}
     cam_file = os.path.join(house_dir, "cameras.yaml")
     if os.path.exists(cam_file):
-        with open(cam_file) as f:
+        with open(cam_file, encoding="utf-8") as f:
             cams = yaml.safe_load(f)
     t, h = lay["wall_thickness"], lay["wall_height"]
     g = []

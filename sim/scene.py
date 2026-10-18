@@ -13,8 +13,7 @@ import mujoco
 from house import build
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DUCK_XML = os.path.expanduser(
-    "~/ext/microduck_rl/src/mjlab_microduck/robot/microduck/robot_groundcontact_backlash.xml")
+from duck import DUCK_XML  # noqa: E402
 PERSON_DIR = os.path.join(ROOT, "assets", "person")
 
 
@@ -30,7 +29,7 @@ def quat_mul(a, b):
 
 
 def add_person(spec, name, x, y, yaw, pose="stand"):
-    with open(os.path.join(PERSON_DIR, "person.json")) as f:
+    with open(os.path.join(PERSON_DIR, "person.json"), encoding="utf-8") as f:
         info = json.load(f)
     q = quat_z(yaw)
     z = 0.0
@@ -109,6 +108,6 @@ if __name__ == "__main__":
     spec = compose(a.house, duck, persons, a.ceiling)
     model = spec.compile()
     xml = spec.to_xml()
-    with open(a.out, "w") as f:
+    with open(a.out, "w", encoding="utf-8") as f:
         f.write(xml)
     print(f"wrote {a.out}: nbody={model.nbody} ngeom={model.ngeom} ncam={model.ncam} nu={model.nu}")
