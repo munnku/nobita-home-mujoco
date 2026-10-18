@@ -1,79 +1,141 @@
-# のび太君の家 (野比家) 1 階の間取り。
+# のび太君の家 (野比家) の間取り。1 階と 2 階。
 # 出典: LIFULL HOME'S「ドラえもん・野比家の間取り」(https://www.homes.co.jp/cont/living/living_00324/) の
-#      2005 年以降の間取り図 (村上洋一「野比家の製作」に転載されたもので寸法を読み取った)。
-# 図の居間 8 畳を 3.64m 四方として縮尺を決め、半間 (0.91m) 単位に丸めた。
-# この縮尺で 1 階 約 63m² + 2 階 約 21m² ≒ 記事の推定床面積 83.83m² と一致する。
-# 座標: 建物の南西の角が原点、x が東、y が北 [m]。図の上を北とした (玄関が南)。
-#
-# このファイルから scripts/build_house.py が Gazebo のワールドと Nav2 の地図を作る (二重管理しない)。
-# 2 階 (のび太の部屋) はロボットが階段を上れないので作らない (IoT 機器だけで見守る)。
+#      2005 年以降の間取り図 (図の上を北とした)。
+# 座標: 図を半間 (0.91 m) のマス目で読み取り、そのマス目の単位で書く。原点は建物の南西の角 (DK の西の壁の線と
+#      居間の南の壁の線の交点)、x が東、y が北。高さ (z, height) だけは m。
+# 確かめ: 居間 8 畳 = 4×4 マス (3.64 m 四方)、DK 10 畳 = 4×5 マス、応接室 6 畳 = 3×4 マス、のび太の部屋 6 畳 = 4×3 マス。
+#        1 階 78 マス + 2 階 23 マス = 約 83.6 m² ≈ 記事の推定床面積 83.83 m²。
+# このファイルから sim/house.py が MuJoCo の家 (MJCF) を作り、経路探索の地図もここから作る (二重管理しない)。
 
 name: nobita
+module: 0.91
 wall_thickness: 0.12
-wall_height: 2.4
+ground_z: -0.45          # 地面 (1 階の床は地面より 45 cm 高い)
 
-# 壁: 線分 [x1, y1, x2, y2] (縦か横)。gaps は扉などの開口 (線分の向きの座標の範囲)
+levels:
+  1F: {z: 0.0, height: 2.4}     # height: 床から天井まで
+  2F: {z: 2.7, height: 2.4}     # 2 階の床 = 1 階の天井 + 床の厚み 0.3 m
+
+# 部屋 (床) [xmin, xmax, ymin, ymax]。material は床の仕上げ。z は階の床からの差 (玄関の土間は低い)
+rooms:
+  - {name: dk, label: DK, level: 1F, rect: [0, 4, 1, 6], material: wood}
+  - {name: rouka, label: 廊下, level: 1F, rect: [4, 10.5, 4, 6], material: wood}
+  - {name: genkan, label: 玄関, level: 1F, rect: [10.5, 12, 4, 6], material: tile, z: -0.2}
+  - {name: ima, label: 居間, level: 1F, rect: [4, 9, 0, 4], material: tatami}
+  - {name: ousetsu, label: 応接室, level: 1F, rect: [9, 12, 0, 4], material: wood}
+  - {name: yokushitsu, label: 浴室, level: 1F, rect: [4, 6, 6, 8], material: tile}
+  - {name: senmen, label: 洗面脱衣, level: 1F, rect: [6, 8, 6, 8], material: vinyl}
+  - {name: toilet, label: トイレ, level: 1F, rect: [8, 9, 6, 8], material: vinyl}
+  - {name: nobita, label: のび太の部屋, level: 2F, rect: [5, 9, 1, 4], material: tatami}
+  - {name: hall2, label: 2 階の廊下, level: 2F, rect: [4, 5, 0, 3.2], material: wood}
+  - {name: oshiire2, label: ドラえもんの寝床, level: 2F, rect: [6, 9, 0, 1], material: wood}
+  - {name: mono2, label: 物入, level: 2F, rect: [5, 6, 0, 1], material: wood}
+
+# 外 (見た目だけ)。z は 1 階の床からの高さ
+outside:
+  - {name: katteguchi, rect: [0, 1, 6, 7], z: -0.25, material: concrete}
+  - {name: porch, rect: [12, 14, 4, 6], z: -0.3, material: concrete}
+  - {name: garden, rect: [-2.5, 15.5, -3, 10], z: -0.45, material: grass}
+
+# 壁: 線分 [x1, y1, x2, y2] (縦か横)。
+# openings: 開口。at は線分の向きの座標の範囲 (マス)。door を付けると扉 (doors の名前)
+# windows: 窓 (床から 0.9〜2.0 m がガラス)。height を書くと低い壁 (見切り)
 walls:
-  # 外壁
-  - {seg: [0.0, 0.0, 3.64, 0.0]}                          # 応接室 南
-  - {seg: [3.64, 0.0, 5.46, 0.0]}                         # 玄関の扉 (閉じている)
-  - {seg: [0.0, 0.0, 0.0, 7.28]}                          # 応接室・居間 西
-  - {seg: [0.0, 7.28, 0.91, 7.28]}
-  - {seg: [0.91, 7.28, 0.91, 10.92]}                      # DK 西
-  - {seg: [0.91, 10.92, 5.46, 10.92]}                     # DK 北
-  - {seg: [5.46, 7.28, 5.46, 10.92]}                      # DK 東 (勝手口は閉じている)
-  - {seg: [5.46, 7.28, 7.28, 7.28]}                       # 浴室 北
-  - {seg: [7.28, 2.73, 7.28, 7.28]}                       # 水回り 東
-  - {seg: [5.46, 2.73, 7.28, 2.73]}                       # トイレ 南
-  - {seg: [5.46, 0.0, 5.46, 2.73]}                        # 玄関 東
-  # 内壁
-  - {seg: [0.0, 2.73, 3.64, 2.73]}                        # 応接室 / 居間
-  - {seg: [3.64, 0.0, 3.64, 7.28], gaps: [[1.75, 2.60], [2.80, 3.60]]}   # 廊下 西 (応接室・居間の扉)
-  - {seg: [0.91, 7.28, 4.55, 7.28]}                       # 居間・階段 / DK (廊下の上は DK へ開いている)
-  - {seg: [5.46, 2.73, 5.46, 7.28], gaps: [[2.85, 3.50], [3.85, 4.75]]}  # 廊下 東 (トイレ・洗面所の扉)
-  - {seg: [5.46, 3.64, 7.28, 3.64]}                       # トイレ / 洗面所
-  - {seg: [5.46, 5.46, 7.28, 5.46], gaps: [[5.85, 6.65]]} # 洗面所 / 浴室
+  # ---- 1 階 外壁
+  - {level: 1F, seg: [0, 1, 0, 6], windows: [[2.7, 3.4]]}                          # DK 西
+  - {level: 1F, seg: [0, 1, 4, 1], windows: [[1.15, 3.0]]}                         # DK 南
+  - {level: 1F, seg: [0, 6, 4, 6], openings: [{at: [0.1, 1.0], door: katteguchi}]} # DK 北 (勝手口)
+  - {level: 1F, seg: [4, 0, 12, 0], windows: [[5.3, 8.8], [9.5, 11.7]]}            # 居間・応接室 南
+  - {level: 1F, seg: [12, 0, 12, 4], windows: [[1.1, 2.7]]}                        # 応接室 東
+  - {level: 1F, seg: [12, 4, 12, 6], openings: [{at: [4.3, 5.75], door: genkan}]}  # 玄関 東 (玄関の扉)
+  - {level: 1F, seg: [9, 6, 12, 6]}                                                # 玄関・廊下 北
+  - {level: 1F, seg: [4, 6, 4, 8]}                                                 # 浴室 西
+  - {level: 1F, seg: [4, 8, 9, 8], windows: [[4.5, 5.3], [7.2, 7.9]]}              # 水回り 北
+  - {level: 1F, seg: [9, 6, 9, 8], windows: [[6.55, 7.4]]}                         # トイレ 東
+  - {level: 1F, seg: [4, 0, 4, 1]}                                                 # 仏壇の西
+  # ---- 1 階 内壁
+  - {level: 1F, seg: [4, 1, 4, 6], openings: [{at: [5.05, 5.95], door: dk_rouka}]} # DK / 押入・階段・廊下
+  - {level: 1F, seg: [4, 6, 9, 6], openings: [{at: [6.1, 7.0], door: senmen}, {at: [8.1, 8.9], door: toilet}]}  # 水回り / 廊下
+  - {level: 1F, seg: [6, 6, 6, 8], openings: [{at: [6.1, 6.85], door: yokushitsu}]}  # 浴室 / 洗面
+  - {level: 1F, seg: [8, 6, 8, 8]}                                                 # 洗面 / トイレ
+  - {level: 1F, seg: [4, 4, 12, 4], openings: [{at: [7.2, 8.9], door: ima}, {at: [9.15, 9.95], door: ousetsu}, {at: [10.5, 12]}]}  # 廊下 / 居間・応接室 (玄関の前は開口)
+  - {level: 1F, seg: [9, 0, 9, 4]}                                                 # 居間 / 応接室
+  - {level: 1F, seg: [4, 5, 5.3, 5]}                                               # 階段の北 (廊下側の壁)
+  # ---- 2 階 外壁
+  - {level: 2F, seg: [4, 0, 4, 5], windows: [[1.8, 3.2]]}                          # 2 階 西 (廊下の窓)
+  - {level: 2F, seg: [4, 0, 9, 0]}                                                 # 2 階 南
+  - {level: 2F, seg: [9, 0, 9, 4], windows: [[1.6, 2.9]]}                          # のび太の部屋 東 (机の前の窓)
+  - {level: 2F, seg: [7, 4, 9, 4], windows: [[7.15, 8.5]]}                         # のび太の部屋 北
+  - {level: 2F, seg: [4, 5, 7, 5]}                                                 # 階段の北
+  - {level: 2F, seg: [7, 4, 7, 5]}                                                 # 階段の東
+  # ---- 2 階 内壁
+  - {level: 2F, seg: [5, 1, 5, 4], openings: [{at: [2.35, 3.15], door: nobita}]}   # 廊下 / のび太の部屋
+  - {level: 2F, seg: [5, 4, 7, 4]}                                                 # 階段 / のび太の部屋
+  - {level: 2F, seg: [5, 1, 9, 1]}                                                 # 部屋 / 押入 (ふすま)
+  - {level: 2F, seg: [5, 0, 5, 1]}                                                 # 廊下 / 物入
+  - {level: 2F, seg: [6, 0, 6, 1]}                                                 # 物入 / ドラえもんの寝床
 
-# 床の仕上げ [xmin, xmax, ymin, ymax]
-floors:
-  - {name: ousetsu, rect: [0.0, 3.64, 0.0, 2.73], material: wood}
-  - {name: ima, rect: [0.0, 3.64, 2.73, 7.28], material: tatami}
-  - {name: rouka, rect: [3.64, 5.46, 1.27, 7.28], material: wood}
-  - {name: genkan, rect: [3.64, 5.46, 0.0, 1.27], material: tile}
-  - {name: dk, rect: [0.91, 5.46, 7.28, 10.92], material: wood}
-  - {name: sanitary, rect: [5.46, 7.28, 2.73, 7.28], material: tile}
+# 扉。hinge: 開き戸 (hinge_at = 軸のある端 from/to、swing = 開く側 +1/-1 (+1 は線分の左側)、open = 開いた角度 [deg])
+#      slide: 引き戸 (開くと壁の中へ引き込む)
+#      state: 初めの状態 (open / closed)。lock: スマートロックが付いている (IoT)
+doors:
+  genkan: {type: hinge, hinge_at: to, swing: -1, open: 90, state: closed, lock: true}
+  katteguchi: {type: hinge, hinge_at: from, swing: 1, open: 90, state: closed, lock: true}
+  dk_rouka: {type: slide, state: open}
+  senmen: {type: slide, state: open}
+  toilet: {type: hinge, hinge_at: to, swing: -1, open: 90, state: closed}
+  yokushitsu: {type: slide, state: open}
+  ima: {type: slide, state: open}          # ふすま
+  ousetsu: {type: hinge, hinge_at: from, swing: -1, open: 95, state: open}
+  nobita: {type: hinge, hinge_at: to, swing: -1, open: 95, state: open}
 
-# 家具 (床から高さ height の直方体。LiDAR にも地図にも同じ形で写る)
+# 階段 (1 階の廊下の東の端から西へ上がり、西の端で南へ折れて 2 階の廊下へ)。
+# 見た目と当たり判定だけ (アヒルは上れない)。各段は下まで詰まった箱 (solid) か、厚さ 0.2 m の板
+stairs:
+  total_rise: 2.7
+  runs:
+    - {axis: x, from: 7.0, to: 5.0, across: [4.0, 5.0], steps: 9, solid: true}     # 直階段 (東から西へ)
+    - {axis: y, from: 5.0, to: 3.2, across: [4.0, 5.0], steps: 5, solid: false}    # 回り階段 (北から南へ、押入の上)
+
+# 家具 [xmin, xmax, ymin, ymax] (マス)、height は床からの高さ [m]、z0 は床からの浮き [m]
 furniture:
-  # 居間 (8 畳の和室)
-  - {name: oshiire, rect: [1.82, 3.58, 6.37, 7.22], height: 1.8, color: paper}      # 押入
-  - {name: butsudan, rect: [0.06, 0.91, 6.47, 7.22], height: 1.2, color: dark}      # 仏壇
-  - {name: tokonoma, rect: [0.91, 1.82, 6.47, 7.22], height: 0.15, color: wood}     # 床の間
-  - {name: chabudai, rect: [1.35, 2.25, 4.15, 5.05], height: 0.33, color: wood}     # ちゃぶ台
-  - {name: tv_stand, rect: [1.5, 2.6, 2.79, 3.15], height: 0.5, color: dark}
-  # 応接室
-  - {name: sofa, rect: [0.9, 2.7, 2.0, 2.65], height: 0.75, color: sofa}
-  - {name: center_table, rect: [1.2, 2.4, 1.1, 1.7], height: 0.4, color: wood}
-  - {name: armchair_l, rect: [1.0, 1.6, 0.1, 0.75], height: 0.75, color: sofa}
-  - {name: armchair_r, rect: [1.9, 2.5, 0.1, 0.75], height: 0.75, color: sofa}
   # DK
-  - {name: kitchen, rect: [1.0, 4.2, 10.3, 10.86], height: 0.85, color: white}
-  - {name: fridge, rect: [4.6, 5.4, 10.15, 10.86], height: 1.8, color: white}
-  - {name: dining_table, rect: [2.1, 3.1, 8.3, 9.6], height: 0.7, color: wood}
-  - {name: sideboard, rect: [1.0, 3.0, 7.34, 7.8], height: 0.8, color: wood}
-  # 階段 (上れないので箱として置く。下の端 y=3.64 が上り口)
-  - {name: stairs, rect: [3.64, 4.55, 3.64, 7.28], height: 1.2, color: wood}
+  - {level: 1F, name: fridge, rect: [0.07, 0.95, 5.05, 5.95], height: 1.8, color: white}       # 冷蔵庫 (北西の角)
+  - {level: 1F, name: kitchen, rect: [0.15, 0.85, 1.2, 4.1], height: 0.85, color: white}       # 流し台・コンロ (西の壁沿い)
+  - {level: 1F, name: dining_table, rect: [1.85, 2.7, 2.35, 4.0], height: 0.7, color: wood}
+  - {level: 1F, name: dining_chair_w1, rect: [1.45, 1.8, 3.25, 3.7], height: 0.45, color: wood}
+  - {level: 1F, name: dining_chair_w2, rect: [1.45, 1.8, 2.6, 3.05], height: 0.45, color: wood}
+  - {level: 1F, name: dining_chair_e1, rect: [2.75, 3.1, 3.25, 3.7], height: 0.45, color: wood}
+  - {level: 1F, name: dining_chair_e2, rect: [2.75, 3.1, 2.6, 3.05], height: 0.45, color: wood}
+  - {level: 1F, name: cupboard, rect: [3.5, 3.95, 1.2, 3.1], height: 1.0, color: wood}         # 食器棚 (東の壁沿い)
+  # 押入・床の間・仏壇 (居間の西の帯)
+  - {level: 1F, name: oshiire, rect: [4.05, 4.95, 2.05, 3.95], height: 1.8, color: paper}
+  - {level: 1F, name: tokonoma, rect: [4.05, 4.95, 1.0, 2.0], height: 0.1, color: wood}
+  - {level: 1F, name: butsudan, rect: [4.05, 4.6, 0.05, 0.95], height: 1.2, color: dark}
+  # 居間
+  - {level: 1F, name: chabudai, rect: [6.45, 7.45, 1.7, 2.7], height: 0.33, color: wood}       # ちゃぶ台
+  - {level: 1F, name: tv_stand, rect: [8.35, 8.85, 1.55, 2.65], height: 0.5, color: dark}
+  - {level: 1F, name: tv, rect: [8.45, 8.55, 1.65, 2.55], height: 0.45, z0: 0.5, color: black}
+  # 応接室
+  - {level: 1F, name: bookshelf, rect: [9.05, 9.35, 0.2, 2.6], height: 1.8, color: wood}
+  - {level: 1F, name: sofa, rect: [9.55, 10.15, 0.9, 2.8], height: 0.75, color: sofa}
+  - {level: 1F, name: center_table, rect: [10.35, 10.85, 1.1, 2.6], height: 0.4, color: wood}
+  - {level: 1F, name: armchair_n, rect: [11.1, 11.75, 2.1, 2.85], height: 0.75, color: sofa}
+  - {level: 1F, name: armchair_s, rect: [11.1, 11.75, 0.95, 1.7], height: 0.75, color: sofa}
   # 水回り
-  - {name: bathtub, rect: [5.9, 7.2, 5.85, 7.2], height: 0.55, color: white}
-  - {name: washbasin, rect: [6.6, 7.2, 4.6, 5.35], height: 0.85, color: white}
-  - {name: washer, rect: [6.6, 7.2, 3.7, 4.4], height: 0.9, color: white}
-  - {name: toilet, rect: [6.6, 7.15, 2.85, 3.5], height: 0.4, color: white}
+  - {level: 1F, name: bathtub, rect: [4.25, 5.9, 6.95, 7.85], height: 0.55, color: white}
+  - {level: 1F, name: washbasin, rect: [6.1, 6.95, 7.3, 7.9], height: 0.85, color: white}
+  - {level: 1F, name: washer, rect: [7.2, 7.9, 7.2, 7.9], height: 0.9, color: white}
+  - {level: 1F, name: toilet_bowl, rect: [8.25, 8.8, 7.2, 7.85], height: 0.4, color: white}
+  # 2 階 のび太の部屋
+  - {level: 2F, name: desk, rect: [8.35, 8.95, 1.7, 3.0], height: 0.72, color: wood}           # 東の窓の前の机
+  - {level: 2F, name: bookcase, rect: [5.05, 7.0, 3.5, 3.95], height: 0.9, color: wood}         # 北の壁沿いの本棚
+  - {level: 2F, name: closet_shelf, rect: [6.05, 8.95, 0.05, 0.95], height: 0.05, z0: 0.8, color: wood}  # ドラえもんの寝床の中段
 
-# 地図だけに入れる進入禁止 (玄関の土間との段差。ロボットは降りられない)
-keepout:
-  - [3.64, 5.46, 1.20, 1.30]
+# 1 階の天井 (2 階の床の下と階段の吹き抜けを除く) と屋根 [マス]。見下ろしで見るときは隠す
+ceilings:
+  1F: [[0, 4, 1, 6], [4, 10.5, 5, 6], [7, 10.5, 4, 5], [10.5, 12, 4, 6], [9, 12, 0, 4], [4, 9, 6, 8]]
+  2F: [[4, 9, 0, 4], [4, 7, 4, 5]]
 
-# 敷地 (見た目だけ。扉は閉じているのでロボットは出ない)
-site:
-  rect: [-4.0, 9.0, -3.0, 13.0]   # ブロック塀の内側
-  gate: [3.8, 5.3]                 # 南の塀の門 (x の範囲)
+# 照明 (部屋の名前)。MuJoCo の描画は 8 灯までなので、太陽を入れて 8 灯にする
+lights: [dk, rouka, genkan, ima, ousetsu, senmen, nobita]

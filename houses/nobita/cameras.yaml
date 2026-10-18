@@ -1,20 +1,13 @@
-# のび太君の家の IoT カメラ (見守りカメラ)。天井近く (高さ 2.3m、天井 2.4m) の角から部屋を見下ろす
-# pose: [x, y, z, roll, pitch, yaw]  (pitch > 0 で下向き)
-# area: そのカメラが見る範囲 [xmin, xmax, ymin, ymax] (部屋。home.yaml の rects)。人の位置の推定をこの中に収める
-image_width: 640
-image_height: 480
-horizontal_fov: 1.6
-update_rate: 2.0
+# のび太君の家の IoT カメラ (見守りカメラ)。天井近くの角から部屋を見下ろす。
+# pos / look_at: [x, y, z]。x y は layout.yaml と同じマス (0.91 m)、z は m (2 階の床は 2.7 m)
+# 浴室・洗面・トイレにはカメラを置かない (人感センサーだけ)
+width: 640
+height: 480
+fovy: 70
+rate: 2.0        # 撮る回数 [回/秒]
 cameras:
-  - name: cam_ima        # 居間 (南西の角から北東を見る)
-    pose: [0.15, 2.85, 2.3, 0.0, 0.65, 0.80]
-    area: [0.0, 3.64, 2.73, 7.28]
-  - name: cam_ousetsu    # 応接室 (南西の角から北東を見る)
-    pose: [0.15, 0.15, 2.3, 0.0, 0.70, 0.65]
-    area: [0.0, 3.64, 0.0, 2.73]
-  - name: cam_dk         # DK (北西の角から南東を見る)
-    pose: [1.05, 10.78, 2.3, 0.0, 0.60, -0.74]
-    area: [0.91, 5.46, 7.28, 10.92]
-  - name: cam_rouka      # 廊下 (北の端から玄関の方を見る)
-    pose: [5.3, 7.1, 2.3, 0.0, 0.35, -1.70]
-    area: [3.64, 5.46, 0.0, 7.28]   # 廊下と玄関
+  - {name: cam_ima, room: ima, pos: [8.85, 0.15, 2.3], look_at: [5.8, 2.6, 0.4]}         # 居間 (南東の角から北西)
+  - {name: cam_ousetsu, room: ousetsu, pos: [11.85, 3.85, 2.3], look_at: [10.2, 1.2, 0.4]}  # 応接室 (北東の角から南西)
+  - {name: cam_dk, room: dk, pos: [3.85, 5.85, 2.3], look_at: [1.8, 2.5, 0.4]}           # DK (北東の角から南西)
+  - {name: cam_rouka, room: rouka, pos: [11.85, 5.85, 2.3], look_at: [6.5, 4.8, 0.3]}    # 廊下と玄関 (玄関の上から西)
+  - {name: cam_nobita, room: nobita, pos: [5.15, 1.15, 5.0], look_at: [7.5, 2.8, 3.0]}   # のび太の部屋 (南西の角から北東)
