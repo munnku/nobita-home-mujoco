@@ -169,6 +169,15 @@ class FloorMap:
         g = self.nearest_free(*goal)
         if s is None or g is None:
             return None
+        walk = self.reach(start)
+        if not np.isfinite(walk[g]):
+            # 目的地のそばへは行けない (人や家具でふさがれている): 歩いて行ける所のうち目的地に一番近い所へ
+            gi, gj = self.to_cell(*goal)
+            ii, jj = np.nonzero(np.isfinite(walk))
+            if len(ii) == 0:
+                return None
+            k = int(np.argmin((ii - gi) ** 2 + (jj - gj) ** 2))
+            g = (int(ii[k]), int(jj[k]))
         cost_extra = np.clip(CLEARANCE - self.dist, 0, None) / CLEARANCE * 4.0
         openq = [(0.0, s)]
         came = {s: None}

@@ -10,7 +10,7 @@ places:
   dk_table: {x: 3.1, y: 3.4, yaw: 180, level: 1F}       # 食卓の東の椅子のあたり
   ima_center: {x: 6.0, y: 3.0, yaw: -90, level: 1F}
   ima_fall: {x: 5.5, y: 1.2, yaw: 0, level: 1F}         # 居間で倒れる (足元、体は yaw の向きに伸びる)
-  ousetsu_sofa: {x: 10.4, y: 3.2, yaw: 180, level: 1F}
+  ousetsu_sofa: {x: 11.0, y: 3.3, yaw: -120, level: 1F}  # 応接室のテーブルの北 (入口をふさがない)
   rouka_mid: {x: 8.0, y: 5.0, yaw: 180, level: 1F}
   rouka_fall: {x: 8.6, y: 4.7, yaw: 170, level: 1F}
   ousetsu_fall: {x: 10.2, y: 0.5, yaw: 0, level: 1F}    # 応接室の肘掛け椅子の陰で倒れる

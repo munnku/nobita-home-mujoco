@@ -60,11 +60,13 @@ def main():
     if a.viewer:
         import mujoco.viewer
         viewer = mujoco.viewer.launch_passive(w.model, w.data)
+    control = {}
+    mq.subscribe("sim/control", lambda t, p: control.update(cmd=p))      # "stop" で止める (録画を閉じてから終わる)
     mq.publish("sim/status", "running", retain=True)
     print(f"[sim] scenario={a.scenario} duration={duration}s speed={a.speed}", flush=True)
     t_wall0 = time.time()
     next_pub = 0.0
-    while w.time < duration:
+    while w.time < duration and control.get("cmd") != "stop":
         scen.tick()
         devices.tick()
         agent.tick()

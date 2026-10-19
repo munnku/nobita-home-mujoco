@@ -85,6 +85,16 @@ curl http://127.0.0.1:8080/things/validate
 uv run python app/llm_agent.py "居間の様子を見てきて"
 ```
 
+まとめて試す: `uv run python app/demo_wot.py [--offline] ["頼みごと" ...]`
+(ブローカー・昼間の場面 daytime・司令塔・WoT サーバーを起動し、頼みごとを順に llm_agent へ渡す)
+
+結果 (10/19、規則で動かした場合):
+- 「応接室の様子を見てきて」→ checkRoom。アヒルが応接室まで歩き、ママが立っているのを確認した (0.96)。見守りカメラの結果も添えて返す。
+- 「居間の照明を消して」「玄関の鍵を閉めて」→ Homie の /set。
+- 「アヒルはどこにいる？」→ robot/state を読む。
+- 「戻って」→ returnToDock。
+- Claude で動かす確認は、ANTHROPIC_API_KEY を設定してから行う (まだ)。
+
 - `wot_server.py` は WoT の窓口（http://127.0.0.1:8080）を開く。
 - `/things/validate` は、すべての TD を W3C TD 1.1 の JSON Schema で検証する。
 - `llm_agent.py` は頼みごとを実行する。`ANTHROPIC_API_KEY` がなければ簡単な規則で動く。
@@ -132,6 +142,11 @@ uv run python app/llm_agent.py "居間の様子を見てきて"
   → order ごとに一意の ID にした (VDA 5050)。
 - のび太が起きたあとも、アヒルがママに「まだ起きません」と伝えに行っていた。
   → 起きたら、その仕事を cancelOrder で取り消すようにした。
+
+### WoT からの依頼
+- 「応接室の様子を見てきて」で、アヒルがすぐにあきらめた。原因は、ママが応接室の入口の内側に立っていて通れなかったこと。
+  → 目的地のそばへ行けなければ、歩いて行ける所のうち目的地に一番近い所まで行くようにした (FloorMap.plan)。
+  → ママの居場所を、入口をふさがない所へ移した。
 
 ### 家具の陰の転倒 (fall_ousetsu)
 - 推定した位置が壁際にずれ、そこへ行く経路が無くて、アヒルがすぐにあきらめていた。
