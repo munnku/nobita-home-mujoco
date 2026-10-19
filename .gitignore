@@ -5,3 +5,4 @@ __pycache__/
 third_party/
 .venv/
 !models/yolo_nobita.pt
+runs/
