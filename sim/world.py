@@ -24,7 +24,8 @@ DEFAULT_HOUSE = os.path.join(ROOT, "houses", "nobita")
 LIGHT_ON = np.array([0.45, 0.44, 0.40])
 # 歩き方の方策ごとの前進の指令の上限と下限 (learning/eval_gait.py で測った)
 #   velstand (公開): 指令の 1/3 ほどの速さ。nobita_walk (この家で強化学習): 0.4 で 0.34 m/s、0.2 以下では足踏み
-POLICY_SPEED = {"velstand": (0.3, 0.0), "alpha_walking": (0.3, 0.0), "nobita_walk": (0.4, 0.32)}
+POLICY_SPEED = {"velstand": (0.3, 0.0), "alpha_walking": (0.3, 0.0), "nobita_walk": (0.4, 0.32),
+                "nobita_walk2": (0.4, 0.3)}
 MAX_RETRIES = 3       # 進まなくなったときに経路を作り直す回数
 
 
@@ -34,8 +35,8 @@ class World:
         # 既定は、この家で強化学習した歩き方 (models/nobita_walk.onnx) があればそれ、なければ公開の velstand
         default = "nobita_walk" if os.path.exists(os.path.join(ROOT, "models", "nobita_walk.onnx")) else "velstand"
         policy = policy or os.environ.get("DUCK_POLICY", default)
-        if policy == "nobita_walk":
-            policy = os.path.join(ROOT, "models", "nobita_walk.onnx")
+        if policy.startswith("nobita_walk"):
+            policy = os.path.join(ROOT, "models", policy + ".onnx")
         self.layout = load_layout(house_dir)
         self.module = self.layout["module"]
         spec, self.door_open_q = compose(house_dir, duck=True, n_persons=n_persons)
