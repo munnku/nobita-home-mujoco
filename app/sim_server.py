@@ -1,0 +1,95 @@
+"""シミュレーションのサーバー: 家 (MuJoCo) + IoT 機器 + アヒル (VDA 5050) + 人役の時刻表 を MQTT につなぐ。
+
+uv run python app/sim_server.py --scenario fall [--speed 1.0] [--viewer] [--record build/videos/fall.mp4]
+--speed: 実時間の何倍で進めるか (0 = できるだけ速く)
+MQTT: homie/... (家の機器)、uagv/v2/NobitaHome/microduck-01/... (アヒル)、home/time (シミュレーションの時刻)、
+      home/speech (アヒルの発話)、sim/scenario・sim/truth (評価用の正解。司令塔は使わない)
+"""
+import argparse
+import math
+import os
+import sys
+import time
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.join(ROOT, "sim"))
+if sys.platform.startswith("linux"):
+    os.environ.setdefault("MUJOCO_GL", "egl")
+
+import yaml  # noqa: E402
+
+from home.devices import HomeDevices  # noqa: E402
+from home.mqttc import Mqtt  # noqa: E402
+from home.perception import PersonDetector  # noqa: E402
+from home.scenario import Scenario  # noqa: E402
+from home.vda5050 import Agent  # noqa: E402
+from world import DEFAULT_HOUSE, World  # noqa: E402
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--house", default=DEFAULT_HOUSE)
+    ap.add_argument("--scenario", default="fall")
+    ap.add_argument("--speed", type=float, default=1.0)
+    ap.add_argument("--viewer", action="store_true")
+    ap.add_argument("--record", default=None)
+    ap.add_argument("--duration", type=float, default=None)
+    a = ap.parse_args()
+
+    with open(os.path.join(a.house, "home.yaml"), encoding="utf-8") as f:
+        home = yaml.safe_load(f)
+    mod = 0.91
+    dock = home["robot"]["dock"]
+    w = World(a.house, duck_pose=(dock["x"] * mod, dock["y"] * mod, math.radians(dock["yaw"])),
+              n_persons=len(home["people"]))
+    det = PersonDetector()
+    mq = Mqtt("sim-server", will=("sim/status", "offline"))
+    devices = HomeDevices(w, mq, det, a.house)
+    agent = Agent(w, mq, det)
+    scen = Scenario(w, mq, a.house, a.scenario)
+    duration = a.duration or scen.duration
+    rec = None
+    if a.record:
+        from app.recorder import Recorder
+        rec = Recorder(w, a.record)
+        mq.subscribe("home/log", lambda t, p: rec.log(p.get("text", "") if isinstance(p, dict) else str(p)))
+    viewer = None
+    if a.viewer:
+        import mujoco.viewer
+        viewer = mujoco.viewer.launch_passive(w.model, w.data)
+    mq.publish("sim/status", "running", retain=True)
+    print(f"[sim] scenario={a.scenario} duration={duration}s speed={a.speed}", flush=True)
+    t_wall0 = time.time()
+    next_pub = 0.0
+    while w.time < duration:
+        scen.tick()
+        devices.tick()
+        agent.tick()
+        w.step()
+        if rec:
+            rec.tick(devices, agent)
+        if w.time >= next_pub:
+            next_pub = w.time + 1.0
+            mq.publish("home/time", round(w.time, 1))
+            mq.publish("sim/truth", {"time": round(w.time, 1), "persons": w.person_state,
+                                     "robot": dict(zip(("x", "y", "theta"), (round(v, 2) for v in w.duck.pose()))),
+                                     "fallen": bool(w.duck.fallen())})
+        if viewer is not None:
+            if not viewer.is_running():
+                break
+            viewer.sync()
+        if a.speed > 0:
+            lag = w.time / a.speed - (time.time() - t_wall0)
+            if lag > 0:
+                time.sleep(lag)
+    mq.publish("sim/status", "finished", retain=True)
+    if rec:
+        rec.close()
+    print(f"[sim] done: sim {w.time:.0f}s in wall {time.time() - t_wall0:.0f}s", flush=True)
+    time.sleep(0.5)
+    mq.close()
+
+
+if __name__ == "__main__":
+    main()

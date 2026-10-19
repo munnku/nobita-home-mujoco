@@ -22,9 +22,13 @@ class Navigator:
     def __init__(self):
         self.stop()
 
-    def set_path(self, path, goal_yaw=None):
-        """path: [(x, y), ...] (最初の点は今いる所)。goal_yaw: 着いたあとに向く向き (なければ None)。"""
+    def set_path(self, path, goal_yaw=None, target=None, tolerance=None):
+        """path: [(x, y), ...] (最初の点は今いる所)。goal_yaw: 着いたあとに向く向き (なければ None)。
+        target, tolerance: 本当の目的地とその許容距離 (VDA 5050 の allowedDeviationXY)。
+        目的地そのものに立てない (人のそば) ときは、target から tolerance 以内に入れば着いたとする。"""
         self.path = [tuple(p) for p in path]
+        self.target = target
+        self.tolerance = tolerance
         self.s = 0.0                  # 経路に沿って進んだ距離 (戻らない)
         self.seg_len = [math.dist(a, b) for a, b in zip(self.path[:-1], self.path[1:])]
         self.goal_yaw = goal_yaw
@@ -37,6 +41,7 @@ class Navigator:
     def stop(self):
         self.path, self.seg_len, self.s = [], [], 0.0
         self.goal_yaw, self.done, self.arrived, self.stuck = None, True, False, False
+        self.target, self.tolerance = None, None
         self._progress, self.t = (0.0, None), 0.0
 
     def _point_at(self, s):
@@ -68,7 +73,9 @@ class Navigator:
             return 0.0, 0.0
         if self.path and not self.arrived:
             gx, gy = self.path[-1]
-            if math.hypot(gx - x, gy - y) < REACH_GOAL:
+            near_target = (self.target is not None and self.tolerance is not None
+                           and math.hypot(self.target[0] - x, self.target[1] - y) < self.tolerance)
+            if math.hypot(gx - x, gy - y) < REACH_GOAL or near_target:
                 self.arrived = True
             else:
                 t0, p0 = self._progress

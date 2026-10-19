@@ -45,6 +45,7 @@ class World:
         self.map = FloorMap(m, self.data, self.layout["rooms"], self.module, ignore_bodies=ignore)
         self.nav = Navigator()
         self.goal, self.retries, self.last_path = None, 0, None
+        self.manual_cmd = (0.0, 0.0, 0.0)
         self.time = 0.0
         self._renderers = {}
 
@@ -54,7 +55,7 @@ class World:
             vx, wz = self.nav.update(*self.duck.pose())
             self.duck.set_cmd(vx, 0.0, wz)
         else:
-            self.duck.set_cmd(0.0, 0.0, 0.0)
+            self.duck.set_cmd(*self.manual_cmd)
             if self.nav.stuck and self.goal is not None and self.retries < MAX_RETRIES:
                 # 進まなくなった: いまの位置から経路を作り直す
                 self.retries += 1
@@ -64,17 +65,27 @@ class World:
         self.time += 0.02
 
     # ---- 移動
-    def go_to(self, x, y, yaw=None):
-        """(x, y) [m] へ向かう経路を作ってアヒルに渡す。経路がなければ False。"""
-        self.goal, self.retries = (x, y, yaw), 0
-        return self._plan(x, y, yaw)
+    def go_to(self, x, y, yaw=None, tolerance=None):
+        """(x, y) [m] へ向かう経路を作ってアヒルに渡す。経路がなければ False。
+        tolerance: (x, y) からこの距離に入れば着いたとする (人のそばなど、その点には立てないとき)。"""
+        self.goal, self.retries = (x, y, yaw, tolerance), 0
+        return self._plan(x, y, yaw, tolerance)
 
-    def _plan(self, x, y, yaw=None):
+    def stop(self):
+        self.goal = None
+        self.nav.stop()
+        self.manual_cmd = (0.0, 0.0, 0.0)
+
+    def set_manual_cmd(self, vx=0.0, vy=0.0, wz=0.0):
+        """経路をたどっていないときの速度指令 (その場で向きを変えるときなど)。"""
+        self.manual_cmd = (vx, vy, wz)
+
+    def _plan(self, x, y, yaw=None, tolerance=None):
         px, py, _ = self.duck.pose()
         path = self.map.plan((px, py), (x, y))
         if path is None:
             return False
-        self.nav.set_path(path, goal_yaw=yaw)
+        self.nav.set_path(path, goal_yaw=yaw, target=(x, y), tolerance=tolerance)
         self.last_path = path
         return True
 
@@ -116,6 +127,11 @@ class World:
             pos, quat = person_pose(x, y, yaw, pose, self.layout["levels"][level]["z"])
         self.data.mocap_pos[mid] = pos
         self.data.mocap_quat[mid] = quat
+        # 見せ方の group: 1 階の人は 1、2 階の人は 2 階と同じ 4 (1 階の見下ろしで浮いて見えないように)
+        grp = 4 if level == "2F" else 1
+        for g in range(self.model.ngeom):
+            if self.model.geom_bodyid[g] == b and self.model.geom_group[g] in (1, 4):
+                self.model.geom_group[g] = grp
         self.person_state[i] = None if x is None else {"x": x, "y": y, "yaw": yaw, "pose": pose,
                                                        "level": level}
         if update_map and hasattr(self, "map"):

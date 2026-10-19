@@ -1,0 +1,19 @@
+# のび太君の家の暮らしの設定 (x y はマス 0.91 m、yaw は度、z の代わりに level)
+robot:
+  dock: {x: 8.0, y: 3.4, yaw: -90}      # アヒルの待機場所 (居間の入口の内側、テレビの横)
+people:
+  - {name: tamako, label: ママ (玉子)}
+  - {name: nobita, label: のび太}
+# 人役を置く場所 (足元の位置と顔の向き)
+places:
+  dk_kitchen: {x: 1.2, y: 2.6, yaw: 180, level: 1F}     # 流し台の前
+  dk_table: {x: 3.1, y: 3.4, yaw: 180, level: 1F}       # 食卓の東の椅子のあたり
+  ima_center: {x: 6.0, y: 3.0, yaw: -90, level: 1F}
+  ima_fall: {x: 5.5, y: 1.2, yaw: 0, level: 1F}         # 居間で倒れる (足元、体は yaw の向きに伸びる)
+  ousetsu_sofa: {x: 10.4, y: 3.2, yaw: 180, level: 1F}
+  rouka_mid: {x: 8.0, y: 5.0, yaw: 180, level: 1F}
+  rouka_fall: {x: 8.6, y: 4.7, yaw: 170, level: 1F}
+  senmen: {x: 7.0, y: 6.6, yaw: 90, level: 1F}
+  nobita_desk: {x: 8.0, y: 2.3, yaw: 0, level: 2F}
+  nobita_futon: {x: 6.2, y: 2.0, yaw: 0, level: 2F}     # 布団で寝ている
+  outside: null

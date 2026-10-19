@@ -17,6 +17,9 @@ dependencies = [
     # Microduck のサーボのモデル (microduck_rl が使っているのと同じ版)
     "better-actuator-models",
     "ultralytics>=8.3",
+    "amqtt>=0.12.1",
+    "torch==2.9.1",
+    "torchvision",
 ]
 
 [tool.uv]
@@ -24,3 +27,10 @@ package = false
 
 [tool.uv.sources]
 better-actuator-models = { git = "https://github.com/Rhoban/bam.git", rev = "62bd8ce12154340be97e06f7f41a0ca8f116d967" }
+torch = { index = "pytorch-cu128" }
+torchvision = { index = "pytorch-cu128" }
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true

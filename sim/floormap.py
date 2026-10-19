@@ -16,6 +16,7 @@ RES = 0.05            # 1 マス 5 cm
 ROBOT_RADIUS = 0.15   # アヒルの足元の半径 + 余裕
 CLEARANCE = 0.30      # これより壁に近いと費用が増える
 BAND = (0.01, 0.35)   # アヒルがぶつかる高さ
+SIGHT_CLEARANCE = 0.15  # 人を見る線から家具までの距離がこれより近いと見通しが悪いとする
 
 
 def _geom_corners(model, data, g):
@@ -220,6 +221,38 @@ class FloorMap:
             out.append(cells[nxt])
             k = nxt
         return out
+
+    def viewpoint(self, target, start, r_min=0.8, r_max=1.3, ignore_near=0.6):
+        """target [m] を見通せる立ち位置を選ぶ。target から r_min〜r_max の通れるセルのうち、
+        target までの線分 (target の近く ignore_near は人自身なので除く) に障害物がなく、start に近いもの。"""
+        ti, tj = self.to_cell(*target)
+        best, best_cost = None, 1e18
+        n = int(r_max / RES) + 1
+        for di in range(-n, n + 1):
+            for dj in range(-n, n + 1):
+                r = math.hypot(di, dj) * RES
+                i, j = ti + di, tj + dj
+                if not (r_min <= r <= r_max and 0 <= i < self.w and 0 <= j < self.h and self.free[i, j]):
+                    continue
+                if not self._sight(i, j, ti, tj, ignore_near):
+                    continue
+                x, y = self.to_xy(i, j)
+                cost = math.hypot(x - start[0], y - start[1]) + 2.0 * abs(r - (r_min + r_max) / 2)
+                if cost < best_cost:
+                    best, best_cost = (x, y), cost
+        return best
+
+    def _sight(self, i0, j0, i1, j1, ignore_near):
+        n = int(max(abs(i1 - i0), abs(j1 - j0))) + 1
+        stop = int(ignore_near / RES)
+        for k in range(n + 1):
+            i = round(i0 + (i1 - i0) * k / n)
+            j = round(j0 + (j1 - j0) * k / n)
+            if math.hypot(i - i1, j - j1) <= stop:
+                return True
+            if self.dist[i, j] < SIGHT_CLEARANCE:      # 見る線の近くに家具などがあれば見通しが悪い
+                return False
+        return True
 
     def image(self, path=None, marks=()):
         """確認用の絵 (北が上)。白 = 通れる、灰 = 壁の近く、黒 = 障害物。"""

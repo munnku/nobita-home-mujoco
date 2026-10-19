@@ -1,0 +1,9 @@
+# 居間でママが倒れる。IoT カメラが横になった人を見つけ、司令塔がアヒルを向かわせる
+name: fall
+description: ママが台所から居間へ行き、居間で倒れる
+duration: 300
+events:
+  - {t: 0, who: tamako, at: dk_kitchen, pose: stand}
+  - {t: 0, who: nobita, at: nobita_desk, pose: stand}
+  - {t: 15, who: tamako, at: ima_center, pose: stand}
+  - {t: 30, who: tamako, at: ima_fall, pose: lie}
