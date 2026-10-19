@@ -63,6 +63,8 @@ def main():
     ap.add_argument("--repeat", type=int, default=1)
     ap.add_argument("--weights", default=None, help="YOLO の重み (既定は models/yolo_nobita.pt があればそれ)")
     ap.add_argument("--policy", default=None, help="アヒルの歩き方 (velstand / nobita_walk)")
+    ap.add_argument("--speed", default="2", help="実時間の何倍で進めるか (0 = できるだけ速く。司令塔は実時間で動くので、"
+                                               "0 だと司令塔の反応の遅れがシミュレーションの時間で大きく見える)")
     a = ap.parse_args()
     if a.policy:
         os.environ["DUCK_POLICY"] = a.policy
@@ -72,7 +74,7 @@ def main():
     for name in a.only:
         for k in range(a.repeat):
             before = set(glob.glob(os.path.join(ROOT, "build", "runs", f"{name}_*.json")))
-            subprocess.run([PY, os.path.join(ROOT, "app", "run_scenario.py"), "--scenario", name, "--speed", "0"],
+            subprocess.run([PY, os.path.join(ROOT, "app", "run_scenario.py"), "--scenario", name, "--speed", a.speed],
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             new = sorted(set(glob.glob(os.path.join(ROOT, "build", "runs", f"{name}_*.json"))) - before)
             if not new:
