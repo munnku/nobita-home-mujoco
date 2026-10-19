@@ -37,6 +37,11 @@ class Recorder:
         self.font_small = jp_font(16)
         self.lines = []            # 状況の文 (新しいものが下)
         self.head_boxes = []
+        self.focus_room, self.focus_until = None, 0.0
+
+    def focus(self, room, seconds=25.0):
+        """しばらくその部屋の見守りカメラを出す (司令塔が部屋のことを知らせたとき)。"""
+        self.focus_room, self.focus_until = room, self.w.time + seconds
 
     def log(self, text):
         line = f"[{self.w.time:4.0f}s] "
@@ -56,7 +61,8 @@ class Recorder:
         frame[:, :800] = self.w.render(self.top, 800, 720, groups=(0, 1, 2))
         x, y, _ = self.w.duck.pose()
         room = self.w.room_of(x, y)
-        cam_name = self._room_camera(devices, room)
+        show = self.focus_room if self.w.time < self.focus_until else room
+        cam_name = self._room_camera(devices, show) or self._room_camera(devices, room)
         if cam_name:
             # アヒルがいる部屋の見守りカメラ (YOLO の枠と推定した姿勢を重ねる)
             src = devices.latest_images.get(cam_name)

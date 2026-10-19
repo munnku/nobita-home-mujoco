@@ -53,7 +53,14 @@ def main():
     if a.record:
         from app.recorder import Recorder
         rec = Recorder(w, a.record)
-        mq.subscribe("home/log", lambda t, p: rec.log(p.get("text", "") if isinstance(p, dict) else str(p)))
+        def on_log(t, p):
+            if isinstance(p, dict):
+                rec.log(p.get("text", ""))
+                if p.get("room"):
+                    rec.focus(p["room"])
+            else:
+                rec.log(str(p))
+        mq.subscribe("home/log", on_log)
         mq.subscribe("home/speech", lambda t, p: rec.log(f"[{p.get('speaker')}]「{p.get('text')}」")
                      if isinstance(p, dict) and p.get("speaker") != "microduck-01" else None)
     viewer = None

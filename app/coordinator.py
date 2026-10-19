@@ -301,7 +301,7 @@ class Coordinator:
         now = secs(self.clock)
         if w["state"] == "idle" and now >= secs(cfg["time"]) and now < secs(cfg["time"]) + 3600:
             if self._asleep():
-                self.log(f"{cfg['time'][:5]} になってものび太が布団で寝ている → 起こす", kind="wake_up")
+                self.log(f"{cfg['time'][:5]} になってものび太が布団で寝ている → 起こす", kind="wake_up", room=cfg["room"])
                 self.light(cfg["room"])
                 self.speaker(cfg["room"], "のび太くん、7時だよ。起きて！")
                 cp = cfg["call_point"]
@@ -311,11 +311,11 @@ class Coordinator:
                 w["state"] = "done"
         elif w["state"] == "called":
             if self._asleep() is False:
-                self.log("のび太が起きた", kind="woke_up")
+                self.log("のび太が起きた", kind="woke_up", room=cfg["room"])
                 self.speaker(cfg["room"], "おはよう！朝ごはんができているよ。")
                 w["state"] = "done"
             elif self.time - w["t"] > cfg["retry_after"] and w["tries"] == 1:
-                self.log("まだ寝ている → もう一度起こす")
+                self.log("まだ寝ている → もう一度起こす", room=cfg["room"])
                 self.speaker(cfg["room"], "のび太くん！遅刻するよ！")
                 cp = cfg["call_point"]
                 self.add_job(Job("wake_up", 1).go(cp["x"] * M, cp["y"] * M, 0.25).say("のび太くーん！遅刻しますよー！"))
@@ -333,7 +333,7 @@ class Coordinator:
                     self.m.publish("home/alerts", {"type": "not_awake", "time": round(self.time, 1)}, qos=1)
                 w.update(state="told", t=self.time, tries=3)
         elif w["state"] == "told" and self._asleep() is False:
-            self.log("のび太が起きた", kind="woke_up")
+            self.log("のび太が起きた", kind="woke_up", room=cfg["room"])
             self.speaker(cfg["room"], "おはよう！")
             self.cancel_jobs("tell_mama")       # 知らせに行く途中なら取り消す
             w["state"] = "done"
@@ -375,7 +375,7 @@ class Coordinator:
         if d not in self.locked:
             return
         if self.door_open.get(d) and e["state"] == "idle":
-            self.log("玄関の扉が開いた (開閉センサー) → アヒルが見に行く", kind="door_open")
+            self.log("玄関の扉が開いた (開閉センサー) → アヒルが見に行く", kind="door_open", room="rouka")
             self.light("genkan")
             tg = cfg["look_target"]
             job = Job("entrance", 2).go(tg["x"] * M, tg["y"] * M, 2.0, [
