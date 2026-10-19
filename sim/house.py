@@ -118,9 +118,10 @@ class Builder:
                     if top > z + DOOR_HEAD + 0.01:
                         piece(nm + "_head", s, e, z + DOOR_HEAD, top)
                     if o.get("door"):
-                        self.door(o["door"], horiz, x1, y1, s, e, z, g)
+                        self.door(o["door"], horiz, x1, y1, s, e, z, g, room=(s - a, b - e))
 
-    def door(self, name, horiz, x1, y1, s, e, z, group):
+    def door(self, name, horiz, x1, y1, s, e, z, group, room=(1e9, 1e9)):
+        """room: 開口の前後に残っている壁の長さ (マス)。引き戸はこれが長い側へ引き込む。"""
         d = self.lay["doors"][name]
         k = self.m
         width = (e - s) * k
@@ -147,17 +148,20 @@ class Builder:
                 f'rgba="0.8 0.7 0.3 1" contype="0" conaffinity="0" group="{group}"/></body>')
             self.door_open[name] = sign * ang
         else:
-            # 引き戸: 壁の片側に寄せて置き、線分の向きと逆へ引き込む
+            # 引き戸: 壁の片側に寄せて置き、壁が長く残っている側へ引き込む (はみ出さない分だけ開く)
             cx, cy = (p_from[0] + p_to[0]) / 2, (p_from[1] + p_to[1]) / 2
             off = self.t / 2 + th / 2 + 0.005
             yaw = math.atan2(diry, dirx)
+            sgn = -1.0 if room[0] >= room[1] else 1.0
+            travel = min(width * 0.98, max(room) * k - self.t / 2)
+            rng = f"{-travel:.3f} 0" if sgn < 0 else f"0 {travel:.3f}"
             color = COLORS["fusuma"] if name == "ima" else COLORS["door"]
             self.bodies.append(
                 f'<body name="door_{name}" pos="{cx - diry*off:.4f} {cy + dirx*off:.4f} {z:.3f}" euler="0 0 {yaw:.4f}">'
-                f'<joint name="door_{name}" type="slide" axis="1 0 0" range="{-width:.3f} 0" damping="200" frictionloss="20"/>'
+                f'<joint name="door_{name}" type="slide" axis="1 0 0" range="{rng}" damping="200" frictionloss="20"/>'
                 f'<geom name="door_{name}_leaf" type="box" pos="0 0 {DOOR_HEAD/2+0.01:.3f}" '
                 f'size="{width/2:.4f} {th/2} {DOOR_HEAD/2-0.01:.3f}" rgba="{color}" group="{group}" mass="5"/></body>')
-            self.door_open[name] = -width * 0.98
+            self.door_open[name] = sgn * travel
 
     # ---- 階段
     def stairs(self):

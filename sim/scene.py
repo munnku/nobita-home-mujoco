@@ -1,20 +1,21 @@
-"""家 (sim/house.py) に Microduck と人をつないで 1 つの MJCF を書き出す。
+"""家 (sim/house.py) に Microduck と人をつないだ MjSpec を作る。
 
-python sim/scene.py <家のフォルダ> <出力 xml> [--duck x,y,yaw] [--person x,y,yaw,pose ...]
-pose は stand (立つ) か lie (横になる)。人は動かない置物 (mocap なしの固定 body)。
+人は mocap の body (物理で動かず、位置と向きを書けば瞬間移動する置物)。立つ・横になる・座るの姿勢は
+体ごと回して表す (メッシュは立った姿勢の 1 つだけ)。当たり判定は体の軸に沿ったカプセル 1 本。
 """
-import argparse
 import json
 import math
 import os
 
 import mujoco
 
-from house import build
+from duck import DUCK_XML
+from house import build_with_info
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-from duck import DUCK_XML  # noqa: E402
 PERSON_DIR = os.path.join(ROOT, "assets", "person")
+EYE_FOVY = 75.0                    # アヒルの頭のカメラを広角にする (元は 45°)
+EYE_TILT_UP = math.radians(10)
 
 
 def quat_z(yaw):
@@ -28,41 +29,43 @@ def quat_mul(a, b):
             w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2, w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2]
 
 
-def add_person(spec, name, x, y, yaw, pose="stand"):
+def person_pose(x, y, yaw, pose="stand", floor_z=0.0):
+    """人の body の (pos, quat)。(x, y) は足元、yaw は顔の向き (横になると頭の向き)。"""
+    if pose == "lie":
+        # 足を (x, y) に置き、体を y 軸まわりに +90° 倒す (頭が yaw の向き)。床から体の厚みの半分浮かす
+        q = quat_mul(quat_z(yaw), [math.cos(math.pi / 4), 0, math.sin(math.pi / 4), 0])
+        return [x, y, floor_z + 0.13], q
+    return [x, y, floor_z], quat_z(yaw)
+
+
+def add_person_assets(spec):
     with open(os.path.join(PERSON_DIR, "person.json"), encoding="utf-8") as f:
         info = json.load(f)
-    q = quat_z(yaw)
-    z = 0.0
-    if pose == "lie":
-        # 足を原点に、体を水平に倒す (y 軸まわりに +90°: 頭が +x 側)、床から少し浮かせる
-        q = quat_mul(q, [math.cos(math.pi / 4), 0, math.sin(math.pi / 4), 0])
-        z = 0.13
-    body = spec.worldbody.add_body(name=name, pos=[x, y, z], quat=q)
+    parts = []
     for i, p in enumerate(info["parts"]):
-        if p["faces"] < 200 and "Low-Poly" in p["name"]:
+        if "Low-Poly" in p["name"]:      # 目の周りの小さな部品 (透明用) は使わない
             continue
-        mesh = spec.add_mesh(name=f"{name}_m{i}", file=os.path.join(PERSON_DIR, p["obj"]))
-        kw = {}
+        mesh = spec.add_mesh(name=f"person_m{i}", file=os.path.join(PERSON_DIR, p["obj"]))
+        mat = None
         if p["png"]:
-            tex = spec.add_texture(name=f"{name}_t{i}", type=mujoco.mjtTexture.mjTEXTURE_2D,
+            tex = spec.add_texture(name=f"person_t{i}", type=mujoco.mjtTexture.mjTEXTURE_2D,
                                    file=os.path.join(PERSON_DIR, p["png"]))
-            mat = spec.add_material(name=f"{name}_mat{i}")
+            mat = spec.add_material(name=f"person_mat{i}")
             mat.textures[mujoco.mjtTextureRole.mjTEXROLE_RGB] = tex.name
-            kw["material"] = mat.name
-        body.add_geom(name=f"{name}_g{i}", type=mujoco.mjtGeom.mjGEOM_MESH, meshname=mesh.name,
+        parts.append((mesh.name, mat.name if mat else None))
+    return parts
+
+
+def add_person(spec, parts, name, x=0.0, y=-5.0, yaw=0.0, pose="stand"):
+    pos, quat = person_pose(x, y, yaw, pose)
+    body = spec.worldbody.add_body(name=name, pos=pos, quat=quat, mocap=True)
+    for k, (mesh, mat) in enumerate(parts):
+        kw = {"material": mat} if mat else {}
+        body.add_geom(name=f"{name}_g{k}", type=mujoco.mjtGeom.mjGEOM_MESH, meshname=mesh,
                       contype=0, conaffinity=0, group=1, **kw)
-    # ぶつかり判定は円柱 1 本 (ロボットが人を通り抜けないように)
-    if pose == "lie":
-        body.add_geom(name=f"{name}_col", type=mujoco.mjtGeom.mjGEOM_CAPSULE, size=[0.15, 0.8, 0],
-                      pos=[0.95, 0, 0], quat=[math.cos(math.pi / 4), 0, math.sin(math.pi / 4), 0],
-                      rgba=[0, 0, 0, 0], group=3)
-    else:
-        body.add_geom(name=f"{name}_col", type=mujoco.mjtGeom.mjGEOM_CYLINDER, size=[0.22, 0.9, 0],
-                      pos=[0, -0.05, 0.9], rgba=[0, 0, 0, 0], group=3)
-
-
-EYE_FOVY = 75.0          # 広角のカメラにする (元は 45°)
-EYE_TILT_UP = math.radians(10)
+    # 当たり判定: 足元から頭までのカプセル (立てば縦、横になれば横)
+    body.add_geom(name=f"{name}_col", type=mujoco.mjtGeom.mjGEOM_CAPSULE, size=[0.18, 0.7, 0],
+                  pos=[0, -0.05, 0.9], rgba=[0, 0, 0, 0], group=3)
 
 
 def add_duck(spec, x=0.0, y=0.0, yaw=0.0):
@@ -81,33 +84,14 @@ def add_duck(spec, x=0.0, y=0.0, yaw=0.0):
     spec.attach(robot, frame=frame, prefix="")
 
 
-def compose(house_dir, duck=(0.0, 0.0, 0.0), persons=(), ceiling=False):
-    spec = mujoco.MjSpec.from_string(build(house_dir, ceiling=ceiling))
-    spec.compiler.meshdir = ""
-    if duck is not None:
-        add_duck(spec, *duck)
-    for i, p in enumerate(persons):
-        add_person(spec, f"person{i}", *p)
-    return spec
-
-
-if __name__ == "__main__":
-    ap = argparse.ArgumentParser()
-    ap.add_argument("house")
-    ap.add_argument("out")
-    ap.add_argument("--duck", default="0,0,0")
-    ap.add_argument("--no-duck", action="store_true")
-    ap.add_argument("--person", action="append", default=[])
-    ap.add_argument("--ceiling", action="store_true")
-    a = ap.parse_args()
-    duck = None if a.no_duck else tuple(float(v) for v in a.duck.split(","))
-    persons = []
-    for s in a.person:
-        v = s.split(",")
-        persons.append((float(v[0]), float(v[1]), float(v[2]), v[3] if len(v) > 3 else "stand"))
-    spec = compose(a.house, duck, persons, a.ceiling)
-    model = spec.compile()
-    xml = spec.to_xml()
-    with open(a.out, "w", encoding="utf-8") as f:
-        f.write(xml)
-    print(f"wrote {a.out}: nbody={model.nbody} ngeom={model.ngeom} ncam={model.ncam} nu={model.nu}")
+def compose(house_dir, duck=True, n_persons=0):
+    """(MjSpec, 扉の開いた値) を返す。人は家の外 (y=-5) に置いておき、場面に合わせて動かす。"""
+    xml, door_open = build_with_info(house_dir)
+    spec = mujoco.MjSpec.from_string(xml)
+    if duck:
+        add_duck(spec)
+    if n_persons:
+        parts = add_person_assets(spec)
+        for i in range(n_persons):
+            add_person(spec, parts, f"person{i}", x=-1.5 - i, y=-2.5)
+    return spec, door_open

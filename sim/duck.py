@@ -76,7 +76,7 @@ def _rotate_inverse(q, v):
 class Duck:
     """家のシーン (MjSpec、アヒルをつないだもの) から作る。model と data を持ち、step() で 0.02 s 進める。"""
 
-    def __init__(self, spec, policy="alpha_walking"):
+    def __init__(self, spec, policy="velstand"):
         from bam.mujoco import MujocoController
         bam_model = load_bam_model()
         names = apply_bam(spec, bam_model)
