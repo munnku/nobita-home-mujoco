@@ -1,0 +1,486 @@
+<title>のび太君の家のしくみ</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* 間取り図のような紙の地に、畳の緑と柱の木の色。左に目次、右に本文の 2 段 (狭い画面では 1 段) */
+:root {
+  --paper: #f7f8f3;
+  --ink: #1f2a22;
+  --muted: #5b6a5e;
+  --tatami: #5f7a2e;
+  --wood: #8a5a2b;
+  --line: #d9dfd2;
+  --panel: #eef1e7;
+  --code-bg: #e9ede2;
+  --warn: #9a3b26;
+  --font-display: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "Yu Gothic", sans-serif;
+  --font-body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+  --font-mono: "JetBrains Mono", "Consolas", "Menlo", monospace;
+  --step-0: 1rem;
+  --step-1: 1.2rem;
+  --step-2: 1.5rem;
+  --step-3: 2.1rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #161b17; --ink: #e6ebe2; --muted: #a3b0a5; --tatami: #a8c46a; --wood: #d39b63;
+    --line: #2f3a31; --panel: #1e2620; --code-bg: #232c25; --warn: #e48a70; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #161b17; --ink: #e6ebe2; --muted: #a3b0a5; --tatami: #a8c46a; --wood: #d39b63;
+  --line: #2f3a31; --panel: #1e2620; --code-bg: #232c25; --warn: #e48a70; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--font-body);
+  font-size: var(--step-0); line-height: 1.85;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { display: grid; grid-template-columns: 15rem minmax(0, 46rem); gap: 3rem; max-width: 66rem; margin: 0 auto; padding-block: 2.5rem 5rem; }
+nav.toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 1.5rem); align-self: start; font-size: .9rem; line-height: 1.6; }
+nav.toc .label { font-family: var(--font-display); color: var(--tatami); letter-spacing: .08em; font-size: .8rem; }
+nav.toc ol { list-style: none; padding: 0; margin: .6rem 0 0; display: grid; gap: .35rem; counter-reset: s; }
+nav.toc li { counter-increment: s; }
+nav.toc a { color: var(--muted); text-decoration: none; display: grid; grid-template-columns: 1.8rem 1fr; }
+nav.toc a::before { content: counter(s); font-family: var(--font-mono); color: var(--tatami); font-size: .8rem; padding-top: .1rem; }
+nav.toc a:hover, nav.toc a:focus-visible { color: var(--ink); outline: none; text-decoration: underline; }
+main { min-width: 0; }
+header.top { display: grid; gap: .6rem; padding-bottom: 1.6rem; border-bottom: 2px solid var(--ink); }
+header.top .eyebrow { font-family: var(--font-mono); font-size: .78rem; color: var(--wood); letter-spacing: .06em; }
+h1 { font-family: var(--font-display); font-size: var(--step-3); line-height: 1.3; margin: 0; text-wrap: balance; }
+header.top p { margin: 0; color: var(--muted); max-width: 40rem; }
+section { padding-top: 2.6rem; scroll-margin-top: 1rem; }
+h2 { font-family: var(--font-display); font-size: var(--step-2); margin: 0 0 .8rem; text-wrap: balance; display: flex; gap: .7rem; align-items: baseline; }
+h2 .no { font-family: var(--font-mono); font-size: .95rem; color: var(--tatami); }
+h3 { font-family: var(--font-display); font-size: var(--step-1); margin: 1.8rem 0 .4rem; color: var(--ink); }
+p, ul, ol { max-width: 42rem; }
+ul, ol { padding-left: 1.3rem; }
+li { margin: .2rem 0; }
+code { font-family: var(--font-mono); font-size: .86em; background: var(--code-bg); padding: .08em .35em; border-radius: 4px; }
+pre.cmd, pre.ex { font-family: var(--font-mono); font-size: .84rem; line-height: 1.6; background: var(--code-bg); padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; margin: .6rem 0; }
+.why { border-left: 3px solid var(--wood); padding: .2rem 0 .2rem 1rem; margin: 1rem 0; }
+.why b { font-family: var(--font-display); color: var(--wood); font-weight: 700; }
+.try { background: var(--panel); border-radius: 8px; padding: .9rem 1.1rem; margin: 1.2rem 0; }
+.try .tag { font-family: var(--font-display); color: var(--tatami); font-size: .9rem; }
+.try pre.cmd { background: var(--paper); }
+.scroll { overflow-x: auto; margin: .8rem 0; }
+table { border-collapse: collapse; font-size: .9rem; min-width: 30rem; }
+th, td { border-bottom: 1px solid var(--line); padding: .45rem .7rem; text-align: left; vertical-align: top; }
+th { font-weight: 700; color: var(--muted); font-size: .82rem; letter-spacing: .03em; }
+td.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.diagram { overflow-x: auto; background: var(--panel); border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+pre.mermaid { margin: 0; font-family: var(--font-body); background: transparent; }
+dl.terms { display: grid; grid-template-columns: max-content 1fr; gap: .5rem 1.2rem; max-width: 42rem; }
+dl.terms dt { font-weight: 700; font-family: var(--font-display); }
+dl.terms dd { margin: 0; color: var(--ink); }
+.files { font-family: var(--font-mono); font-size: .82rem; color: var(--muted); }
+.note { color: var(--warn); }
+@media (max-width: 860px) {
+  .wrap { grid-template-columns: 1fr; gap: 1.5rem; padding-block: 1.5rem 4rem; }
+  nav.toc { position: static; border-bottom: 1px solid var(--line); padding-bottom: 1rem; }
+  nav.toc ol { grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); }
+  dl.terms { grid-template-columns: 1fr; gap: .2rem; }
+  dl.terms dd { margin-bottom: .6rem; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+
+<div class="wrap">
+<nav class="toc" aria-label="目次">
+  <div class="label">もくじ</div>
+  <ol>
+    <li><a href="#big">ひとことで</a></li>
+    <li><a href="#parts">登場するもの</a></li>
+    <li><a href="#story">転倒を追いかける</a></li>
+    <li><a href="#house">家</a></li>
+    <li><a href="#duck">アヒルの体と歩き方</a></li>
+    <li><a href="#nav">地図と経路</a></li>
+    <li><a href="#eye">カメラで人を見る</a></li>
+    <li><a href="#mqtt">MQTT と Homie</a></li>
+    <li><a href="#vda">VDA 5050</a></li>
+    <li><a href="#coord">司令塔</a></li>
+    <li><a href="#wot">WoT と LLM</a></li>
+    <li><a href="#yolo">学習 1: YOLO</a></li>
+    <li><a href="#rl">学習 2: 歩き方</a></li>
+    <li><a href="#limits">本物との違い</a></li>
+    <li><a href="#hands">手を動かす順番</a></li>
+    <li><a href="#terms">用語</a></li>
+  </ol>
+</nav>
+
+<main>
+<header class="top">
+  <div class="eyebrow">PAI1-mujoco ・ 2026-10-19 の実装</div>
+  <h1>のび太君の家のしくみ</h1>
+  <p>MuJoCo の中ののび太君の家で、見守りカメラなどの家の機器と、二足歩行の小さなロボット (アヒル) と、LLM が手分けして家族を見守る。その中身を、部品ごとに「何をしているか・どう動くか・なぜそうなっているか」で説明する。各節の終わりに、自分で動かして確かめる方法を書いた。</p>
+</header>
+
+<section id="big">
+  <h2><span class="no">1</span>ひとことで</h2>
+  <p>家に付いている機器が<strong>いつも見ている</strong>。機器だけでは確かめられないことは、アヒルが<strong>近くまで歩いて行って確かめ、声をかける</strong>。人の頼みごとは LLM が<strong>機器とアヒルの操作に変える</strong>。この 3 者を、司令塔という 1 つのプログラムがまとめる。</p>
+  <p>全部がシミュレーションの中で動いている。家・アヒル・人は MuJoCo (物理シミュレーター) の中にあり、カメラの絵も MuJoCo が描く。家の機器や司令塔は、MuJoCo の外の別々のプログラムで、MQTT という通信でつながっている。</p>
+  <div class="why"><b>なぜ別々のプログラムにしたか。</b> 本物の家では、カメラ・照明・ロボット・司令塔はそれぞれ別の機械で、ネットワークでつながっている。シミュレーションでも同じ分け方にしておけば、MuJoCo の部分を本物の機械に替えても、司令塔や LLM の側はそのまま使える。</div>
+</section>
+
+<section id="parts">
+  <h2><span class="no">2</span>登場するもの</h2>
+  <p>動いているプログラムは 4 つ (と MQTT のブローカー)。矢印は MQTT や HTTP でのやりとり。</p>
+  <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+  subgraph SIM["sim_server.py (MuJoCo の世界)"]
+    W["家・人役・アヒル<br/>(World)"]
+    DEV["家の機器<br/>カメラ 5 台 + YOLO<br/>人感センサー・照明<br/>鍵・スピーカー"]
+    AG["アヒルの頭脳<br/>(VDA 5050 Agent)<br/>経路・歩く・見る"]
+    SC["人役の時刻表<br/>(Scenario)"]
+  end
+  B(("MQTT<br/>ブローカー<br/>broker.py"))
+  C["司令塔<br/>coordinator.py<br/>決まりごと"]
+  WOT["WoT サーバー<br/>wot_server.py<br/>説明書 (TD)"]
+  L["LLM<br/>llm_agent.py / Claude Code"]
+  DEV -- "Homie: 見つけた人・人感・鍵" --> B
+  AG -- "VDA 5050: 状態" --> B
+  B -- "照明・鍵の操作" --> DEV
+  B -- "VDA 5050: 指示 (order)" --> AG
+  B <--> C
+  B <--> WOT
+  L -- "HTTP (TD に書かれた住所)" --> WOT
+</pre>
+  </div>
+  <div class="scroll"><table>
+    <tr><th>名前</th><th>ファイル</th><th>役目</th></tr>
+    <tr><td>World</td><td class="files">sim/world.py</td><td>MuJoCo の世界そのもの。家・アヒル・人・扉・照明を持ち、0.02 秒ずつ時間を進める。</td></tr>
+    <tr><td>家の機器</td><td class="files">home/devices.py</td><td>MuJoCo のカメラで絵を撮って YOLO にかけ、見つけた人を MQTT に出す。照明や鍵の操作を受けて MuJoCo の中に反映する。</td></tr>
+    <tr><td>アヒルの頭脳</td><td class="files">home/vda5050.py</td><td>司令塔からの指示 (行き先と、着いたらすること) を受け、経路を作って歩き、頭のカメラで確かめる。</td></tr>
+    <tr><td>人役の時刻表</td><td class="files">home/scenario.py</td><td>「30 秒でママが居間で倒れる」のような出来事を、時刻どおりに起こす。</td></tr>
+    <tr><td>司令塔</td><td class="files">app/coordinator.py</td><td>機器の知らせを見て、照明をつけたり、アヒルに仕事を頼んだりする。家の「判断」はここに集まっている。</td></tr>
+    <tr><td>WoT サーバー</td><td class="files">app/wot_server.py</td><td>機器とアヒルの説明書 (TD) を作って配り、HTTP の操作を MQTT に直す。</td></tr>
+    <tr><td>LLM</td><td class="files">app/llm_agent.py ・ app/wot_mcp.py</td><td>説明書から作った「道具」を使って、人の頼みごとを実行する。</td></tr>
+  </table></div>
+  <div class="why"><b>MuJoCo を知っているのは sim_server だけ。</b> 司令塔・WoT サーバー・LLM は MQTT と HTTP しか知らない。司令塔はアヒルの正確な位置や人の本当の姿勢を MuJoCo から直接読まない。カメラが見つけた結果と、アヒルが自分で報告する状態だけで判断する。</div>
+</section>
+
+<section id="story">
+  <h2><span class="no">3</span>転倒を追いかける</h2>
+  <p>場面 <code>fall</code> で、ママが居間で倒れてから家族に知らせが届くまでを順に追う。全体で 10 秒ほど (学習した歩き方のとき)。</p>
+  <div class="diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant S as 人役の時刻表
+  participant D as 見守りカメラ (居間)
+  participant C as 司令塔
+  participant A as アヒル
+  S->>S: t=30s ママを ima_fall に横向きで置く
+  loop 0.5 秒ごと
+    D->>D: MuJoCo で撮る → YOLO → 位置と姿勢
+    D->>C: persons = [{x, y, posture: lying}]
+  end
+  C->>C: 横になった人を 3 秒見続けた → 転倒の疑い
+  C->>D: 居間の照明をつける (Homie の set)
+  C->>A: order: 人のそばへ行き detectObject
+  A->>A: 人を見通せる立ち位置を選ぶ → A* → 歩く
+  A->>A: 着いたら人の方を向き、頭のカメラ + YOLO
+  A->>C: actionState FINISHED, 結果 {found, posture: lying}
+  C->>C: home/alerts に転倒を出す (家族への知らせ)
+  C->>A: instantActions: speak「大丈夫ですか？」
+</pre>
+  </div>
+  <ol>
+    <li><strong>人役が倒れる。</strong> 時刻表の t=30 の行を見て、ママの人形を居間の床に横向きに置く。人は物理で動く体ではなく「置物」で、置き場所と向きを書き換えるだけ。<span class="files">home/scenario.py</span></li>
+    <li><strong>カメラが撮る。</strong> sim_server が居間の天井の角のカメラで 640×480 の絵を MuJoCo に描かせる。5 台まとめて YOLO にかける。<span class="files">home/devices.py</span></li>
+    <li><strong>位置と姿勢を出す。</strong> 人の枠の下端を床の上の点に直し (足元)、枠の形から「横になっている」と判断する。<span class="files">home/perception.py</span></li>
+    <li><strong>MQTT に出す。</strong> <code>homie/cam-ima/camera/persons</code> に <code>[{"x":5.8,"y":1.2,"posture":"lying",...}]</code> を出す。</li>
+    <li><strong>司令塔が疑う。</strong> 同じ場所の「横になった人」を 3 秒以上見続けたら転倒の疑いとする。1 回だけの誤検出で騒がないため。</li>
+    <li><strong>照明をつけ、アヒルに頼む。</strong> <code>homie/light-ima/light/on/set</code> に <code>true</code>。アヒルには VDA 5050 の order で「この点のそばへ行き、人を探せ (detectObject)」と頼む。</li>
+    <li><strong>アヒルが行く。</strong> 人の真上には立てないので、人から 0.8〜1.3 m で、間に家具がない立ち位置を選び、地図の上で経路を作って歩く。</li>
+    <li><strong>アヒルが確かめる。</strong> 人の方を向き、頭のカメラ (床から 24 cm) の絵を YOLO にかける。横になっている人が見えたら結果を返す。</li>
+    <li><strong>知らせる。</strong> 司令塔は結果を見て <code>home/alerts</code> に転倒を出し、アヒルに「大丈夫ですか？ご家族に知らせました。」と話させる。アヒルが見ると立っていたら、誤報として取り消す。</li>
+  </ol>
+  <div class="try"><div class="tag">確かめる</div>
+    <p>場面を 1 回通し、出来事の時刻を見る。<code>--viewer</code> を付けると MuJoCo の画面でも見られる。</p>
+<pre class="cmd">uv run python app/run_scenario.py --scenario fall --speed 1 --viewer</pre>
+    <p>別の端末で MQTT に流れるものを覗くと、4〜9 の順にメッセージが出るのが見える。</p>
+<pre class="cmd">uv run python app/mqtt_watch.py</pre>
+  </div>
+</section>
+
+<section id="house">
+  <h2><span class="no">4</span>家</h2>
+  <p>家は手で描いていない。間取り図を読み取った <code>houses/nobita/layout.yaml</code> から、<code>sim/house.py</code> が MuJoCo の形式 (MJCF) を毎回作る。</p>
+  <h3>マス目で書く</h3>
+  <p>日本の家は半間 (0.91 m) の倍数で設計されている。間取り図に半間のマス目を重ねると、壁がほぼマス目の線に乗る。そこで YAML の座標はマスの数で書き、作るときに 0.91 を掛けて m にする。</p>
+<pre class="ex">- {name: ima, label: 居間, level: 1F, rect: [4, 9, 0, 4], material: tatami}   # x 4〜9、y 0〜4 マス
+- {level: 1F, seg: [4, 4, 12, 4], openings: [{at: [7.2, 8.9], door: ima}, ...]}   # 壁と扉の開口</pre>
+  <p>確かめ方として、居間 8 畳が 4×4 マス (3.64 m 四方) になり、1 階と 2 階のマスの合計 101 マス ≒ 83.6 m² が、記事の推定床面積 83.83 m² と合う。</p>
+  <h3>作られるもの</h3>
+  <ul>
+    <li><strong>床</strong>: 1 階は地面から床までの箱。玄関の土間は 20 cm 低い箱にしたので、段差がそのまま形になる (アヒルは降りられない)。</li>
+    <li><strong>壁</strong>: 線分を扉と窓のところで切り分けた箱。扉の上 (2.0 m から上) は壁、窓は 0.9〜2.0 m がガラス。</li>
+    <li><strong>扉</strong>: 開き戸は回る関節、引き戸は滑る関節を持つ体。IoT で開け閉めするときは関節の角度を書き換える。</li>
+    <li><strong>階段・家具・天井・屋根・照明 (7 灯)・見守りカメラ (5 台)</strong>。</li>
+  </ul>
+  <div class="why"><b>表示のグループ。</b> MuJoCo の形には見せ方の番号 (group) を付けられる。1 階は 0、2 階は 4、天井と屋根は 5 にした。見下ろしの絵では 4 と 5 を隠すと 1 階の中が見える。人を 2 階に置くと人のグループも 4 に変えるので、1 階を見下ろしたときに 2 階ののび太が浮いて見えない。</div>
+  <div class="why"><b>扉は押されても動かない。</b> 扉の関節は物理で自由に動くので、立っている人の当たり判定に押されて閉まりかけ、アヒルが応接室に入れなくなったことがあった。今は毎ステップ、決めた角度に戻している。</div>
+  <div class="try"><div class="tag">確かめる</div>
+    <p>家を上から・斜めから・各カメラから描いて <code>build/house/</code> に保存する。<code>layout.yaml</code> のちゃぶ台の <code>rect</code> を書き換えてもう一度描くと、家が YAML から作られていることが分かる。</p>
+<pre class="cmd">uv run python spike/house_views.py</pre>
+  </div>
+</section>
+
+<section id="duck">
+  <h2><span class="no">5</span>アヒルの体と歩き方</h2>
+  <p>アヒルは Pollen Robotics の <strong>Microduck</strong> (高さ約 25 cm、サーボ 14 個)。形のデータ (MJCF とメッシュ) は公開リポジトリ microduck_rl から取ってくる。</p>
+  <h3>歩き方は学習済みの方策</h3>
+  <p>二足歩行の関節の動かし方は、人が式で書いたものではなく、強化学習で作られたニューラルネット (方策) が決めている。方策は ONNX という形式のファイルで、<code>sim/duck.py</code> が 1 秒に 50 回これを呼ぶ。</p>
+  <div class="scroll"><table>
+    <tr><th>方策に渡すもの (観測、61 個の数)</th><th>数</th></tr>
+    <tr><td>胴体の回る速さ (ジャイロ)</td><td class="num">3</td></tr>
+    <tr><td>胴体から見た重力の向き (傾き)</td><td class="num">3</td></tr>
+    <tr><td>14 関節の角度 (立った姿勢からの差)</td><td class="num">14</td></tr>
+    <tr><td>14 関節の角速度</td><td class="num">14</td></tr>
+    <tr><td>前回の出力</td><td class="num">14</td></tr>
+    <tr><td>指令: 前・横の速さと回る速さ 3、頭の向き 4、胴体の姿勢 6</td><td class="num">13</td></tr>
+  </table></div>
+  <p>方策が返すのは 14 関節の目標角度 (立った姿勢からの差)。サーボの中の制御 (BAM という実物のサーボを真似たモデル) が、その角度に向けてトルクを出す。MuJoCo は 5 ms ずつ 4 回進めて、次の 0.02 秒へ。</p>
+  <div class="why"><b>使う側は「速度指令」を出すだけ。</b> 経路をたどるプログラムは、関節のことを何も知らない。「前へ 0.3 m/s、左へ 0.5 rad/s 回れ」と指令を出すと、方策がそれに合う歩き方を作る。ただし指令どおりの速さは出ない (公開の方策では指令の 1/3 ほど)。だから経路をたどる側は、毎回いまの位置を見て指令を直し続ける。</div>
+  <h3>頭のカメラ</h3>
+  <p>元のデータのカメラは、設計ソフト (Onshape) の座標のままで、後ろ上を向き、絵も 90° 回っていた。MuJoCo のカメラの約束 (−z が視線、y が上) に合うよう回し、広角 (75°) で少し上向き (10°) にした (<code>sim/scene.py</code> の <code>add_duck</code>)。</p>
+  <div class="try"><div class="tag">確かめる</div>
+    <p>速度指令を出したとき、実際にどれだけ進み、どれだけ回るかを方策ごとに測る。</p>
+<pre class="cmd">uv run python learning/eval_gait.py --policy velstand --policy nobita_walk</pre>
+  </div>
+</section>
+
+<section id="nav">
+  <h2><span class="no">6</span>地図と経路</h2>
+  <p>LiDAR は使っていない。家の形は間取りから分かっているので、地図はそこから作る。</p>
+  <h3>地図 (sim/floormap.py)</h3>
+  <ul>
+    <li>1 階を 5 cm のマスに分ける。</li>
+    <li>「通れる床」は、上面が 1 階の床の高さにある床の形 (土間や外は入らない)。</li>
+    <li>「障害物」は、アヒルがぶつかる高さ (床から 1〜35 cm) にかかる形すべて。壁・家具・閉じた扉・人。<strong>MuJoCo のモデルから直接作る</strong>ので、扉を開け閉めしたり人が動いたりしたら作り直す。</li>
+    <li>障害物からの距離を計算し、アヒルの半径 + 余裕 (15 cm) より近いマスは通れないことにする。壁から 30 cm 以内は少し通りにくい (費用を足す) ので、廊下の真ん中を通りたがる。</li>
+  </ul>
+  <h3>経路 (A*)</h3>
+  <p>A* でマスをたどる最短の道を探し、見通せる点は飛ばして曲がり角だけの経路にする。目的地のそばへ行けない (人や家具でふさがれている) ときは、歩いて行ける所のうち目的地に一番近い所まで行く。</p>
+  <h3>経路をたどる (pure pursuit、sim/navigator.py)</h3>
+  <ul>
+    <li>いまの位置を経路の上に落とし、経路に沿って 30 cm 先の点を狙う。</li>
+    <li>向きが 0.7 rad (約 40°) 以上ずれていたら、止まってその場で回る。合っていれば進みながら向きを直す。</li>
+    <li>12 秒たっても 10 cm も進まず向きも変わらなければ「詰まった」として、いまの位置から経路を作り直す (3 回まで)。</li>
+  </ul>
+  <h3>人を見る立ち位置</h3>
+  <p>人を確かめに行くとき、行き先は人そのものではない。人から 0.8〜1.3 m の通れるマスのうち、人までの線の近く (15 cm) に家具がなく、歩いて行ける場所で、歩く距離が短いものを選ぶ (<code>viewpoint</code>)。最初はちゃぶ台越しに人を見ていて、頭のカメラの視界がふさがれていたのでこうした。</p>
+  <div class="try"><div class="tag">確かめる</div>
+    <p>居間 → DK → 応接室 → 洗面所と歩かせ、地図と経路の絵 (<code>build/nav/map_*.png</code>) と動画を残す。白が通れる所、灰色が壁に近い所、赤線が経路。</p>
+<pre class="cmd">uv run python spike/nav_test.py</pre>
+  </div>
+</section>
+
+<section id="eye">
+  <h2><span class="no">7</span>カメラで人を見る</h2>
+  <p>YOLO は絵の中の人を四角い枠で囲むだけで、床の上のどこにいるかは教えてくれない。そこで、カメラの位置・向き・画角 (MuJoCo のモデルから読む) を使って、枠を床の上の点に直す (<code>home/perception.py</code>)。</p>
+  <h3>足元の位置</h3>
+  <p>枠の下端の真ん中の画素を通る視線をカメラから伸ばし、床 (高さ 0) とぶつかる点を足元とする。ピンホールカメラの式で、画素から視線の向きを出せる。</p>
+  <h3>立っているか、横になっているか</h3>
+  <p>天井のカメラ (高さ 2.3 m) では、枠の上端の視線も床まで伸ばす。</p>
+  <ul>
+    <li>横になった人なら、上端の視線は体の向こう側の床に落ちる。下端との距離は身長くらい (2.6 m より短い)。</li>
+    <li>立っている人なら、上端の視線は頭の上を通って、ずっと遠くの床に落ちる (4 m 以上)。</li>
+    <li>ただしカメラの真下近くの人は縮んで見えて距離が短くなるので、「足元に立てた板の上で頭の高さが 1.5 m 以上なら立っている」も使う。</li>
+  </ul>
+  <p>アヒルの頭のカメラ (高さ 24 cm) では、この方法は使えない (上端の視線が上向きで床に届かない)。代わりに体の上端の高さを測り、80 cm より低ければ横になっているとする。横になった人の位置は、足元ではなく体の真ん中 (上端と下端を床に落とした点の中点)。</p>
+  <div class="why"><b>学習したモデルでは姿勢はクラスで決まる。</b> 追加学習した YOLO は、枠と一緒に「立っている人 / 横になっている人」を答える。今はそれがあれば姿勢はそちらを使い、上の幾何の判定は位置を出すのに使う。</div>
+  <p>最後に、推定した位置はそのカメラの部屋の中 (壁から 25 cm 内側) に収める。壁際の人は壁の向こうに推定されることがあるため。</p>
+  <div class="try"><div class="tag">確かめる</div>
+    <p>人を置いてカメラで撮り、推定と正解を並べて出す。絵は <code>build/perception/</code>。</p>
+<pre class="cmd">uv run python spike/perception_test.py</pre>
+  </div>
+</section>
+
+<section id="mqtt">
+  <h2><span class="no">8</span>MQTT と Homie (家の機器)</h2>
+  <p><strong>MQTT</strong> は、ブローカーという中継役を通して「トピック (住所)」ごとにメッセージを配る通信。出す側は相手を知らなくてよく、欲しい側がトピックを購読する。<code>+</code> と <code>#</code> で複数のトピックをまとめて購読できる。</p>
+  <p><strong>Homie</strong> は、家の機器を MQTT でどう表すかの決まり。機器・ノード・プロパティの 3 段で、値の型や書き込めるかどうかも MQTT に出す。</p>
+<pre class="ex">homie/light-ima/$name                 照明 (居間)
+homie/light-ima/light/on/$datatype    boolean
+homie/light-ima/light/on/$settable    true
+homie/light-ima/light/on              true          ← いまの値
+homie/light-ima/light/on/set          false         ← ここに書くと消える
+homie/cam-ima/camera/persons          [{"x":5.8,"y":1.2,"posture":"lying",...}]</pre>
+  <p>家の機器は、見守りカメラ 5 台・人感センサー (部屋ごと)・照明 7 灯・スマートロック 2 つ (と扉の開閉センサー)・スマートスピーカー 3 台。人感センサーは、人役がその部屋にいるかどうかから値を出している (本物の焦電センサーの代わり)。</p>
+  <div class="why"><b>なぜ決まりに合わせるか。</b> 型や書き込めるかが MQTT に出ているので、受け取る側は機器ごとの説明を手で書かなくてよい。後で出てくる WoT の説明書も、この Homie の記述から自動で作っている。</div>
+  <div class="try"><div class="tag">確かめる</div>
+    <p>家を動かしたまま、照明だけ、カメラだけを覗く。照明を手で消してみる。</p>
+<pre class="cmd">uv run python app/start_home.py</pre>
+<pre class="cmd">uv run python app/mqtt_watch.py "homie/+/light/#"</pre>
+<pre class="cmd">uv run python app/wot_cli.py call light-ima__set__on '{"value": false}'</pre>
+  </div>
+</section>
+
+<section id="vda">
+  <h2><span class="no">9</span>VDA 5050 (アヒルへの指示)</h2>
+  <p>VDA 5050 は、工場の無人搬送車 (AGV) と、それを動かす管理システムの間の決まり。MQTT の上で動く。家のロボットにもそのまま当てはまる部分が多いので使った。</p>
+  <div class="scroll"><table>
+    <tr><th>トピック</th><th>向き</th><th>中身</th></tr>
+    <tr><td><code>…/order</code></td><td>司令塔 → アヒル</td><td>ノード (行き先) とエッジ (道) の列。ノードには着いたらすること (action) を付けられる。</td></tr>
+    <tr><td><code>…/instantActions</code></td><td>司令塔 → アヒル</td><td>いますぐすること。話す、一時停止、order の取り消し。</td></tr>
+    <tr><td><code>…/state</code></td><td>アヒル → 司令塔</td><td>位置、歩いているか、どのノードまで来たか、各 action の状態 (WAITING / RUNNING / FINISHED / FAILED) と結果。1 秒ごと。</td></tr>
+    <tr><td><code>…/factsheet</code></td><td>アヒル → 誰でも</td><td>できること一覧 (どの action をどんな引数で受け付けるか、最高速度など)。</td></tr>
+  </table></div>
+  <p>トピックの頭は <code>uagv/v2/NobitaHome/microduck-01/</code>。使っている action は <code>detectObject</code> (VDA 5050 で決まっている「物を探す」。ここでは人)、<code>speak</code> (この家で足した「話す」)、<code>wait</code>。</p>
+  <div class="why"><b>アヒルが経路を考える。</b> order にはノード (行き先) だけを書く。途中の道はアヒルが自分の地図で考える。ノードの <code>allowedDeviationXY</code> (この距離まで近づけば着いたとする) を使って、「人のそばまで」を表している。</div>
+  <div class="why"><b>アヒルに指示を出すのは司令塔だけ。</b> VDA 5050 では、1 台のロボットに order を出す管理システムは 1 つという前提。LLM がアヒルを動かしたいときも、直接 order を出さずに司令塔に頼む。</div>
+  <div class="try"><div class="tag">確かめる</div>
+    <p>アヒルとのやりとりだけを全部見る。<code>--all</code> を付けると 1 秒ごとの state も出る。</p>
+<pre class="cmd">uv run python app/mqtt_watch.py "uagv/#" --all</pre>
+  </div>
+</section>
+
+<section id="coord">
+  <h2><span class="no">10</span>司令塔 (決まりごとと仕事)</h2>
+  <p><code>app/coordinator.py</code> は 0.05 秒ごとに「決まりごと」を順に見て、必要ならアヒルの「仕事 (Job)」を作る。アヒルは一度に 1 つの仕事しかしないので、仕事は優先度の順に並ぶ (転倒が一番先)。</p>
+  <div class="scroll"><table>
+    <tr><th>決まりごと</th><th>見るもの</th><th>すること</th></tr>
+    <tr><td>転倒</td><td>見守りカメラの「横になった人」</td><td>3 秒続いたら照明をつけ、アヒルに確かめさせ、結果で知らせる / 取り消す。寝室の布団の人は除く。</td></tr>
+    <tr><td>起床</td><td>家の時計 (7:00) と、のび太の部屋のカメラ</td><td>布団で寝ていたら、部屋の照明とスピーカー、アヒルが階段の下から呼ぶ。30 秒ごとにもう一度、それでも起きなければママ (1 階で立っている人) に知らせに行く。起きたら取り消す。</td></tr>
+    <tr><td>玄関</td><td>鍵と扉の開閉センサー</td><td>扉が開いたらアヒルが見に行き、人がいれば「おかえりなさい」。閉まって 20 秒鍵が開いたままなら施錠。</td></tr>
+    <tr><td>照明</td><td>人感センサーと照明</td><td>だれもいない部屋の照明を 60 秒で消す。人が来たらつける。</td></tr>
+    <tr><td>依頼</td><td><code>home/coordinator/requests</code></td><td>WoT (LLM) からの「部屋へ行く・部屋を確かめる・戻る」を仕事にし、終わったら結果を返す。</td></tr>
+  </table></div>
+  <p>仕事は「行く (order を出す)」「話す (instantActions)」「関数を呼ぶ」の手順の列。「行く」では order の最後に短い <code>wait</code> を付けておき、それが FINISHED になったら次の手順へ進む。</p>
+  <div class="why"><b>時刻はシミュレーションの時刻。</b> 司令塔は MuJoCo の外にいるので、sim_server が毎秒出す <code>home/time</code> と <code>home/clock</code> を時計にしている。シミュレーションを速く回すと司令塔の反応が相対的に遅く見えるので、比べるときは速さを実時間の 2 倍に揃えた。</div>
+</section>
+
+<section id="wot">
+  <h2><span class="no">11</span>WoT と LLM</h2>
+  <p><strong>W3C WoT Thing Description (TD)</strong> は、機器の説明書を JSON で書く国際標準。「この機器には何の値があり (properties)、何ができ (actions)、どこにどう頼めばよいか (forms)」が書かれる。</p>
+  <h3>説明書は手で書かない</h3>
+  <ul>
+    <li>家電の TD は、MQTT に出ている Homie の記述から作る。書き込めるプロパティは書ける (<code>readOnly: false</code>) になる。</li>
+    <li>アヒルの TD は、VDA 5050 の factsheet (できること一覧) と、司令塔に頼める仕事 (部屋へ行く・確かめる・戻る) から作る。</li>
+    <li>作った 30 台分の TD は、W3C の公式の JSON Schema で検証している (<code>/things/validate</code>)。</li>
+  </ul>
+  <h3>説明書から LLM の道具を作る (home/wot_tools.py)</h3>
+<pre class="ex">TD の action           → 道具 robot__checkRoom(room)
+TD の書けるプロパティ   → 道具 light-ima__set__on(value)
+読めるプロパティ        → 道具 read_property(target)
+道具を呼ぶ             → TD の forms に書かれた URL と HTTP の種類で wot_server を呼ぶ</pre>
+  <p>LLM は道具の説明を読み、頼みごとに合う道具を選んで引数を入れる。たとえば「応接室の様子を見てきて」なら <code>robot__checkRoom({"room": "ousetsu"})</code>。wot_server はそれを司令塔への依頼に直し、アヒルが行って確かめ終わるまで待って結果を返す。</p>
+  <p>LLM の役は 3 通りに入れ替えられる。どれも同じ道具を使う。</p>
+  <ul>
+    <li><code>app/llm_agent.py</code>: Claude の API (有料、1 回 2〜4 円ほど)。</li>
+    <li><code>app/wot_mcp.py</code>: 道具を MCP サーバーとして出し、Claude Code が使う。このフォルダで Claude Code を開くと道具が見える。</li>
+    <li><code>app/wot_cli.py</code>: コマンドで道具を見たり呼んだりする。Claude Code のセッションから使える。</li>
+  </ul>
+  <div class="try"><div class="tag">確かめる</div>
+    <p>家を動かしたまま、TD を見て、道具の一覧を出し、道具を 1 つ呼ぶ。</p>
+<pre class="cmd">uv run python app/start_home.py</pre>
+<pre class="cmd">curl http://127.0.0.1:8080/things/robot</pre>
+<pre class="cmd">uv run python app/wot_cli.py list</pre>
+<pre class="cmd">uv run python app/wot_cli.py call robot__checkRoom '{"room": "ousetsu"}'</pre>
+  </div>
+</section>
+
+<section id="yolo">
+  <h2><span class="no">12</span>学習 1: YOLO を家に合わせる</h2>
+  <p>公開の YOLOv8s は、たくさんの写真 (COCO) で人を見つけるよう学習済み。でも横になった人や、床すれすれの低い視点の絵は苦手で、居間以外で倒れた人を見逃していた。そこで、この家の絵で追加学習した。</p>
+  <h3>正解付きのデータを自動で作る (learning/make_dataset.py)</h3>
+  <ol>
+    <li>人 2 人を家の中のランダムな場所・向き・姿勢 (立つ / 横になる) に置き、照明をランダムにつけ消しする。</li>
+    <li>見守りカメラ 5 台とアヒルの頭のカメラ (人の近くのランダムな場所) で撮る。</li>
+    <li>同じ視点で「どの画素がどの物か」の絵 (セグメンテーション) も描く。人の画素を集めた外接する箱が、正解の枠になる。人が描き込むラベル付けは要らない。</li>
+  </ol>
+  <p>2000 場面で 7119 枚 (立っている人 3076 人、横になった人 4471 人)。学習 8 : 検証 1 : テスト 1 に分けた。公開の YOLOv8s から始めて 2 クラスで 30 エポック、RTX 3060 で約 50 分。</p>
+  <div class="scroll"><table>
+    <tr><th>テスト 700 枚で</th><th>学習前</th><th>学習後</th></tr>
+    <tr><td>見守りカメラ・横になった人 (見つけて姿勢も正しい)</td><td class="num">28.1%</td><td class="num">97.2%</td></tr>
+    <tr><td>見守りカメラ・立っている人</td><td class="num">87.8%</td><td class="num">98.3%</td></tr>
+    <tr><td>アヒルの頭・横になった人</td><td class="num">15.3%</td><td class="num">93.9%</td></tr>
+    <tr><td>アヒルの頭・立っている人</td><td class="num">20.5%</td><td class="num">91.6%</td></tr>
+  </table></div>
+  <p>学習前のモデルでは、DK と応接室の家具の陰で倒れた場面で知らせが出なかった。学習後は 3 場面ともアヒルが確認して知らせた。</p>
+  <p class="note">テスト画像も同じシミュレーション (同じ人の形、同じ家) から作っているので、この数字は「この家の MuJoCo の絵に対して」の精度。</p>
+  <div class="try"><div class="tag">確かめる</div>
+    <p>データの正解の枠を絵に重ねて並べる (緑 = 立っている、赤 = 横)。学習曲線は <code>docs/learning/results.png</code>。</p>
+<pre class="cmd">uv run python learning/show_labels.py build/datasets/nobita test 16</pre>
+<pre class="cmd">uv run python app/check_scenarios.py --only fall_dk --weights third_party/yolov8s.pt</pre>
+  </div>
+</section>
+
+<section id="rl">
+  <h2><span class="no">13</span>学習 2: 歩き方を強化学習する</h2>
+  <p>公開の歩き方 (velstand) は、この家の MuJoCo では指令の 1/3 ほどの速さでしか進まず、駆けつけるのに時間がかかっていた。そこで Microduck の学習用の仕組み (microduck_rl) を使い、自分の GPU で歩き方を学習し直した。</p>
+  <h3>しくみ</h3>
+  <ul>
+    <li><strong>強化学習 (PPO)</strong>: アヒルに歩かせてみて、「指令の速さについてこられた」「転ばなかった」などで点 (報酬) を付け、点が上がるように方策を少しずつ直す。これを何千回も繰り返す。</li>
+    <li><strong>4096 匹を同時に</strong>: mjlab (MuJoCo Warp) は MuJoCo を GPU の上で動かすので、4096 匹のアヒルを同時に歩かせて経験を集められる。</li>
+    <li>タスクは公開のもの (<code>Mjlab-Velocity-Flat-Backlash-MicroDuck</code>) をそのまま使い、報酬などは変えていない。Docker (GPU 付き) で 1500 回更新、約 2.5 時間。</li>
+  </ul>
+  <div class="scroll"><table>
+    <tr><th>指令</th><th>公開 velstand</th><th>学習した nobita_walk</th></tr>
+    <tr><td>前へ 0.4 m/s</td><td class="num">0.142 m/s</td><td class="num">0.343 m/s</td></tr>
+    <tr><td>前へ 0.3 m/s</td><td class="num">0.096 m/s</td><td class="num">0.111 m/s</td></tr>
+    <tr><td>前へ 0.2 m/s 以下</td><td class="num">ゆっくり進む</td><td class="num">足踏み</td></tr>
+    <tr><td>回る 1.0 rad/s</td><td class="num">0.96 rad/s</td><td class="num">0.48 rad/s</td></tr>
+  </table></div>
+  <p>速いが、小さい指令では足踏みになり、回るのは遅い。そこで方策ごとに前進の指令の上限と下限を決めた (<code>sim/world.py</code> の <code>POLICY_SPEED</code>。nobita_walk は 0.32〜0.4)。転倒の知らせまでの時間は、居間 15.6 → 11.0 秒、応接室 40.6 → 23.6 秒、DK 53.8 → 29.6 秒になった。</p>
+  <p class="note">公開の方策より速くなった理由は、はっきりとは分かっていない。公開の方策は別のタスク (歩く・立つ・起き上がるを 1 つで、でこぼこの床) で学習されていて、その違いが考えられる。</p>
+  <div class="try"><div class="tag">確かめる</div>
+    <p>学習曲線 <code>docs/learning/rl_curve.png</code> を見る。歩き方を替えて同じ場面を回す。</p>
+<pre class="cmd">uv run python app/check_scenarios.py --only fall_dk --policy velstand</pre>
+<pre class="cmd">uv run python app/check_scenarios.py --only fall_dk --policy nobita_walk</pre>
+  </div>
+</section>
+
+<section id="limits">
+  <h2><span class="no">14</span>本物との違い (シミュレーションで省いたこと)</h2>
+  <ul>
+    <li><strong>アヒルの位置</strong>: アヒルは自分の正確な位置を MuJoCo から教えてもらっている。本物では、室内の電波測位 (UWB など) や、見守りカメラでアヒルを見つける、足の動きから位置を数える、などが要る。</li>
+    <li><strong>人</strong>: 置物で、姿勢は「立つ」と「横になる」だけ。歩く人は、立った形のまま滑らせている。座る・しゃがむ姿勢はない。</li>
+    <li><strong>人感センサー</strong>: 人役がその部屋にいるかどうかから値を作っている。</li>
+    <li><strong>学習した YOLO</strong>: 同じ人の形と同じ家の絵で学習・評価した。実物の写真での精度は分からない。</li>
+    <li><strong>階段</strong>: アヒルは上れない。2 階は機器だけで見守り、アヒルは階段の下から呼ぶ。</li>
+    <li><strong>扉</strong>: アヒルは扉を開けられない。開いている扉だけを通る。</li>
+  </ul>
+</section>
+
+<section id="hands">
+  <h2><span class="no">15</span>手を動かす順番</h2>
+  <p>上から順にやると、外側 (見えるもの) から内側 (判断) へ理解が進む。どれも <code>PAI1-mujoco</code> フォルダで実行する。</p>
+  <ol>
+    <li><strong>家を描く</strong>: <code>spike/house_views.py</code>。layout.yaml を少し変えて描き直す。</li>
+    <li><strong>アヒルを歩かせる</strong>: <code>spike/nav_test.py</code>。地図と経路の絵を見る。</li>
+    <li><strong>カメラで人を見る</strong>: <code>spike/perception_test.py</code>。推定と正解の差を見る。</li>
+    <li><strong>場面を通す</strong>: <code>app/run_scenario.py --scenario fall --speed 1 --viewer</code>。同時に <code>app/mqtt_watch.py</code> でメッセージを見る。</li>
+    <li><strong>場面を書き換える</strong>: <code>houses/nobita/scenarios/fall.yaml</code> の倒れる場所 (<code>at</code>) を <code>home.yaml</code> の別の場所に変えて回す。</li>
+    <li><strong>家を動かしたまま頼む</strong>: <code>app/start_home.py</code> を動かし、<code>app/wot_cli.py</code> で道具を呼ぶ。</li>
+    <li><strong>学習の効果を比べる</strong>: <code>app/check_scenarios.py</code> を <code>--weights</code> と <code>--policy</code> を替えて回す。</li>
+  </ol>
+</section>
+
+<section id="terms">
+  <h2><span class="no">16</span>用語</h2>
+  <dl class="terms">
+    <dt>MuJoCo</dt><dd>物理シミュレーター。体と関節、ぶつかり、カメラの絵を計算する。</dd>
+    <dt>MJCF</dt><dd>MuJoCo のモデルを書く形式 (XML)。家は YAML から、アヒルは公開のファイルから作る。</dd>
+    <dt>方策 (policy)</dt><dd>観測を入れると行動 (関節の目標角度) を返すニューラルネット。強化学習で作る。</dd>
+    <dt>ONNX</dt><dd>学習したニューラルネットを保存する共通の形式。学習した道具 (PyTorch) と使う道具が違っても読める。</dd>
+    <dt>PPO</dt><dd>強化学習の方法の 1 つ。方策を一度に大きく変えすぎないように少しずつ直す。</dd>
+    <dt>A*</dt><dd>地図の上で最短の道を探す方法。ゴールまでの見込みの距離を使って、探す範囲を絞る。</dd>
+    <dt>pure pursuit</dt><dd>経路の少し先の点を狙い続けて、経路をなめらかにたどる方法。</dd>
+    <dt>YOLO</dt><dd>絵の中の物を四角い枠とクラス (人など) で答えるニューラルネット。</dd>
+    <dt>mAP50</dt><dd>検出の精度の指標。正解の枠と 50% 以上重なれば当たりとして、見逃しと誤検出の両方を数える。</dd>
+    <dt>セグメンテーション</dt><dd>画素ごとに「どの物か」を塗り分けた絵。MuJoCo は正確に描けるので、正解の枠がただで手に入る。</dd>
+    <dt>MQTT</dt><dd>トピックごとにメッセージを配る通信。ブローカーが中継する。</dd>
+    <dt>Homie</dt><dd>家の機器を MQTT でどう表すかの決まり (機器 / ノード / プロパティ、型、書き込めるか)。</dd>
+    <dt>VDA 5050</dt><dd>無人搬送車と管理システムの間の決まり。order・instantActions・state・factsheet。</dd>
+    <dt>W3C WoT TD</dt><dd>機器の説明書を JSON で書く国際標準。値・できること・頼み方を書く。</dd>
+    <dt>MCP</dt><dd>LLM のアプリに道具を出すための決まり。Claude Code はこれで外の道具を使える。</dd>
+  </dl>
+</section>
+</main>
+</div>
