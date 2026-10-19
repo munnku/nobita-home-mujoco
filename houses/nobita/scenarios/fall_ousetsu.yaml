@@ -1,0 +1,8 @@
+# 応接室の椅子の陰でママが倒れる (家具の陰で、公開の YOLO では見逃しやすい場所)
+name: fall_ousetsu
+description: 応接室の椅子の陰で倒れる
+duration: 200
+events:
+  - {t: 0, who: tamako, at: ousetsu_sofa, pose: stand}
+  - {t: 0, who: nobita, at: nobita_desk, pose: stand}
+  - {t: 20, who: tamako, at: ousetsu_fall, pose: lie}

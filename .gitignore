@@ -4,3 +4,4 @@ __pycache__/
 *.pt
 third_party/
 .venv/
+!models/yolo_nobita.pt

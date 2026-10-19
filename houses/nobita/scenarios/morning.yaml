@@ -8,4 +8,4 @@ events:
   - {t: 0, who: tamako, at: dk_kitchen, pose: stand}
   - {t: 150, who: nobita, at: nobita_desk, pose: stand}     # やっと起きる
   - {t: 175, who: nobita, at: rouka_mid, pose: stand}       # 1 階へ下りてくる
-  - {t: 195, who: nobita, at: dk_table, pose: stand}
+  - {t: 185, who: nobita, at: dk_table, pose: stand, walk: true}

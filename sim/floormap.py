@@ -222,9 +222,32 @@ class FloorMap:
             k = nxt
         return out
 
-    def viewpoint(self, target, start, r_min=0.8, r_max=1.3, ignore_near=0.6):
-        """target [m] を見通せる立ち位置を選ぶ。target から r_min〜r_max の通れるセルのうち、
-        target までの線分 (target の近く ignore_near は人自身なので除く) に障害物がなく、start に近いもの。"""
+    def reach(self, start):
+        """start から通れるセルをたどった歩く距離 [m] の地図 (行けないセルは inf)。"""
+        dist = np.full((self.w, self.h), np.inf)
+        s = self.nearest_free(*start, max_r=0.5)
+        if s is None:
+            return dist
+        dist[s] = 0.0
+        heap = [(0.0, s)]
+        steps = [(1, 0, RES), (-1, 0, RES), (0, 1, RES), (0, -1, RES),
+                 (1, 1, RES * 1.414), (1, -1, RES * 1.414), (-1, 1, RES * 1.414), (-1, -1, RES * 1.414)]
+        while heap:
+            d, (i, j) = heapq.heappop(heap)
+            if d > dist[i, j]:
+                continue
+            for di, dj, c in steps:
+                a, b = i + di, j + dj
+                if 0 <= a < self.w and 0 <= b < self.h and self.free[a, b] and d + c < dist[a, b]:
+                    dist[a, b] = d + c
+                    heapq.heappush(heap, (d + c, (a, b)))
+        return dist
+
+    def viewpoint(self, target, start, r_min=0.8, r_max=1.3, ignore_near=0.6, need_sight=True, area=None):
+        """target [m] を見る立ち位置を選ぶ。start から歩いて行けるセルのうち、target から r_min〜r_max で、
+        target までの線分 (target の近く ignore_near は人自身なので除く) の近くに家具が無く (need_sight)、
+        歩く距離が短いもの。area: [x0, x1, y0, y1] [m] を渡すとその中 (target の部屋) だけから選ぶ。"""
+        walk = self.reach(start)
         ti, tj = self.to_cell(*target)
         best, best_cost = None, 1e18
         n = int(r_max / RES) + 1
@@ -232,12 +255,14 @@ class FloorMap:
             for dj in range(-n, n + 1):
                 r = math.hypot(di, dj) * RES
                 i, j = ti + di, tj + dj
-                if not (r_min <= r <= r_max and 0 <= i < self.w and 0 <= j < self.h and self.free[i, j]):
-                    continue
-                if not self._sight(i, j, ti, tj, ignore_near):
+                if not (r_min <= r <= r_max and 0 <= i < self.w and 0 <= j < self.h and np.isfinite(walk[i, j])):
                     continue
                 x, y = self.to_xy(i, j)
-                cost = math.hypot(x - start[0], y - start[1]) + 2.0 * abs(r - (r_min + r_max) / 2)
+                if area and not (area[0] <= x <= area[1] and area[2] <= y <= area[3]):
+                    continue
+                if need_sight and not self._sight(i, j, ti, tj, ignore_near):
+                    continue
+                cost = walk[i, j] + 2.0 * abs(r - (r_min + r_max) / 2)
                 if cost < best_cost:
                     best, best_cost = (x, y), cost
         return best

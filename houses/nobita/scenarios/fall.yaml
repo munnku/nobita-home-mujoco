@@ -5,5 +5,5 @@ duration: 300
 events:
   - {t: 0, who: tamako, at: dk_kitchen, pose: stand}
   - {t: 0, who: nobita, at: nobita_desk, pose: stand}
-  - {t: 15, who: tamako, at: ima_center, pose: stand}
+  - {t: 12, who: tamako, at: ima_center, pose: stand, walk: true}   # 台所から居間へ歩く
   - {t: 30, who: tamako, at: ima_fall, pose: lie}

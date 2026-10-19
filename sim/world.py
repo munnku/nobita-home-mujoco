@@ -51,6 +51,7 @@ class World:
 
     # ---- 時間
     def step(self):
+        self._hold_doors()
         if not self.nav.done:
             vx, wz = self.nav.update(*self.duck.pose())
             self.duck.set_cmd(vx, 0.0, wz)
@@ -111,6 +112,13 @@ class World:
         self.door_state[name] = bool(is_open)
         if update_map and hasattr(self, "map"):
             self.map.update()
+
+    def _hold_doors(self):
+        """扉は開け閉めしたときだけ動く (人やアヒルに押されて動かないよう、毎回決めた角度に戻す)。"""
+        for name, is_open in self.door_state.items():
+            qa, da = self._joint_adr(name)
+            self.data.qpos[qa] = self.door_open_q[name] if is_open else 0.0
+            self.data.qvel[da] = 0.0
 
     def door_is_open(self, name):
         qa, _ = self._joint_adr(name)

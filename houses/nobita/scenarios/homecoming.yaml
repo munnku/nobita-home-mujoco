@@ -10,5 +10,5 @@ events:
   - {t: 22, door: genkan, do: open}
   - {t: 24, who: nobita, at: genkan_in, pose: stand}
   - {t: 30, door: genkan, do: close}
-  - {t: 90, who: nobita, at: rouka_mid, pose: stand}
-  - {t: 110, who: nobita, at: ima_center, pose: stand}
+  - {t: 90, who: nobita, at: rouka_mid, pose: stand, walk: true}
+  - {t: 105, who: nobita, at: ima_center, pose: stand, walk: true}

@@ -1,0 +1,58 @@
+{
+ "A: 公開 YOLOv8s + 幾何の姿勢判定": {
+  "stats": {
+   "iot/standing": {
+    "n": 230,
+    "found": 206,
+    "posture_ok": 202
+   },
+   "iot/lying": {
+    "n": 324,
+    "found": 106,
+    "posture_ok": 91
+   },
+   "head/standing": {
+    "n": 83,
+    "found": 63,
+    "posture_ok": 17
+   },
+   "head/lying": {
+    "n": 98,
+    "found": 15,
+    "posture_ok": 15
+   }
+  },
+  "false_positives": {
+   "iot": 8,
+   "head": 10
+  }
+ },
+ "B: 追加学習した YOLOv8s (2 クラス)": {
+  "stats": {
+   "iot/standing": {
+    "n": 230,
+    "found": 226,
+    "posture_ok": 226
+   },
+   "iot/lying": {
+    "n": 324,
+    "found": 315,
+    "posture_ok": 315
+   },
+   "head/standing": {
+    "n": 83,
+    "found": 76,
+    "posture_ok": 76
+   },
+   "head/lying": {
+    "n": 98,
+    "found": 92,
+    "posture_ok": 92
+   }
+  },
+  "false_positives": {
+   "iot": 18,
+   "head": 11
+  }
+ }
+}

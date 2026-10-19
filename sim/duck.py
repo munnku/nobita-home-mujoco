@@ -85,8 +85,8 @@ class Duck:
         self.data = mujoco.MjData(self.model)
         self.bam = MujocoController(bam_model, names, self.model, self.data,
                                     vin_drop_gain=BAM_VIN_DROP_GAIN, vin_min=BAM_VIN_MIN)
-        self.session = ort.InferenceSession(os.path.join(POLICY_DIR, policy + ".onnx"),
-                                            providers=["CPUExecutionProvider"])
+        path = policy if policy.endswith(".onnx") else os.path.join(POLICY_DIR, policy + ".onnx")
+        self.session = ort.InferenceSession(path, providers=["CPUExecutionProvider"])
         self.in_name = self.session.get_inputs()[0].name
         self.out_name = self.session.get_outputs()[0].name
         m = self.model

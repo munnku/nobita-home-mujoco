@@ -13,6 +13,8 @@ places:
   ousetsu_sofa: {x: 10.4, y: 3.2, yaw: 180, level: 1F}
   rouka_mid: {x: 8.0, y: 5.0, yaw: 180, level: 1F}
   rouka_fall: {x: 8.6, y: 4.7, yaw: 170, level: 1F}
+  ousetsu_fall: {x: 10.2, y: 0.5, yaw: 0, level: 1F}    # 応接室の肘掛け椅子の陰で倒れる
+  dk_fall: {x: 3.0, y: 4.6, yaw: 92, level: 1F}         # DK の食卓の北で倒れる
   senmen: {x: 7.0, y: 6.6, yaw: 90, level: 1F}
   nobita_desk: {x: 8.0, y: 2.3, yaw: 0, level: 2F}
   nobita_futon: {x: 6.2, y: 2.0, yaw: 0, level: 2F}     # 布団で寝ている

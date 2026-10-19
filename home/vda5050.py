@@ -256,7 +256,15 @@ class Agent:
                 look = self._look_target(node)
                 if look is not None:
                     # 人を見に行くときは、人そのものではなく人を見通せる立ち位置へ行き、人の方を向く
-                    vp = self.w.map.viewpoint(look, (x, y), r_min=0.8, r_max=max(1.3, min(dev, 2.0)))
+                    r_max = max(1.3, min(dev, 2.0))
+                    vp = self.w.map.viewpoint(look, (x, y), r_min=0.8, r_max=r_max)
+                    if vp is None:      # 見通せる所が無ければ、同じ部屋の行ける所から首を振って探す
+                        room = self.w.room_of(*look)
+                        area = None
+                        if room:
+                            rr = next(r for r in self.w.layout["rooms"] if r["name"] == room)["rect"]
+                            area = [v * self.w.module for v in rr]
+                        vp = self.w.map.viewpoint(look, (x, y), r_min=0.5, r_max=3.0, need_sight=False, area=area)
                     if vp is not None:
                         gx, gy, tol = vp[0], vp[1], 0.12
                         gth = math.atan2(look[1] - vp[1], look[0] - vp[0])
@@ -306,6 +314,7 @@ class Agent:
         return None
 
     def _fail_order(self, why):
+        print(f"[agent] order failed: {why}", flush=True)
         self.errors = [{"errorType": "navigationError", "errorLevel": "WARNING", "errorDescription": why}]
         for n in self.order["nodes"][self.node_idx:]:
             for a in n.get("actions", []):
