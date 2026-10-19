@@ -25,6 +25,7 @@ dependencies = [
     "requests>=2.34.2",
     "jsonschema>=4.26.0",
     "anthropic>=1.15.0",
+    "mcp>=2.3.0",
 ]
 
 [tool.uv]

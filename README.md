@@ -22,6 +22,10 @@ uv run python app/run_scenario.py --scenario fall --speed 0 --record build/video
 - 2 行目で Microduck のモデルと学習済み方策を取ってくる。
 - 3 行目で場面を 1 回通す（fall / morning / homecoming）。
 
+頼みごと (LLM) を試すときは、`uv run python app/start_home.py` で家を動かしたまま、次のどれかを使う。
+- Claude API：`uv run python app/llm_agent.py "居間の様子を見てきて"`（`ANTHROPIC_API_KEY` が要る）
+- Claude Code：このフォルダで開くと、MCP サーバー（`.mcp.json`）から家電とアヒルの道具が見える
+
 ## 使っている OSS とデータ
 - [MuJoCo](https://github.com/google-deepmind/mujoco) (Apache-2.0)
 - [pollen-robotics/microduck_rl](https://github.com/pollen-robotics/microduck_rl) (コード Apache-2.0、ロボットのメッシュ CC BY-NC-SA 4.0。このリポジトリには含めない)

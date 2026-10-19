@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "nobita-home": {
+      "command": "uv",
+      "args": ["run", "python", "app/wot_mcp.py"]
+    }
+  }
+}

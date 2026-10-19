@@ -86,6 +86,18 @@ curl http://127.0.0.1:8080/things/validate
 uv run python app/llm_agent.py "居間の様子を見てきて"
 ```
 
+LLM に何を使うか (道具はどれも同じ。TD から home/wot_tools.py で作る):
+
+| 使い方 | LLM | 料金 | 用途 |
+|---|---|---|---|
+| `app/llm_agent.py` | Claude API (既定 claude-sonnet-5-5) | 1 回 約 2〜4 円 | 最終テストと動画 |
+| MCP (`app/wot_mcp.py`、`.mcp.json` に登録) | Claude Code (Pro などのプラン) | プランの範囲 | 開発中に試す。このフォルダで Claude Code を開くと道具が見える |
+| `app/wot_cli.py list / call` | Claude Code のセッションがコマンドで呼ぶ | プランの範囲 | 開発中に試す (MCP を読み込んでいないセッションから) |
+| `app/llm_agent.py --offline` | 簡単な規則 | 無料 | キーが無いときの確認 |
+
+家をずっと動かしておく: `uv run python app/start_home.py [--scenario daytime] [--viewer]`
+(止める: Ctrl+C か `uv run python app/start_home.py --stop`)
+
 まとめて試す: `uv run python app/demo_wot.py [--offline] ["頼みごと" ...]`
 (ブローカー・昼間の場面 daytime・司令塔・WoT サーバーを起動し、頼みごとを順に llm_agent へ渡す)
 
@@ -148,6 +160,11 @@ uv run python app/llm_agent.py "居間の様子を見てきて"
 - 「応接室の様子を見てきて」で、アヒルがすぐにあきらめた。原因は、ママが応接室の入口の内側に立っていて通れなかったこと。
   → 目的地のそばへ行けなければ、歩いて行ける所のうち目的地に一番近い所まで行くようにした (FloorMap.plan)。
   → ママの居場所を、入口をふさがない所へ移した。
+
+### LLM の代わりに Claude Code (10/19)
+- API の料金を抑えるため、開発中は Claude Code (Pro) を LLM として使えるようにした (MCP サーバーとコマンド)。
+- 頼みごとがシミュレーションの起動中 (アヒルの位置がまだ届かない) に来ると、(0, 0) からの経路を頼んで失敗していた。
+  → 司令塔は、アヒルの位置が届くまで仕事を待たせるようにした。
 
 ### 家具の陰の転倒 (fall_ousetsu)
 - 推定した位置が壁際にずれ、そこへ行く経路が無くて、アヒルがすぐにあきらめていた。

@@ -154,6 +154,8 @@ class Coordinator:
         return None
 
     def run_jobs(self):
+        if "agvPosition" not in self.robot:
+            return          # アヒルの位置がまだ届いていない (シミュレーションの起動中)。届くまで仕事を待たせる
         if self.job is None:
             if not self.jobs:
                 return
