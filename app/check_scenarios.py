@@ -62,7 +62,10 @@ def main():
     ap.add_argument("--only", nargs="*", default=["fall", "morning", "homecoming"])
     ap.add_argument("--repeat", type=int, default=1)
     ap.add_argument("--weights", default=None, help="YOLO の重み (既定は models/yolo_nobita.pt があればそれ)")
+    ap.add_argument("--policy", default=None, help="アヒルの歩き方 (velstand / nobita_walk)")
     a = ap.parse_args()
+    if a.policy:
+        os.environ["DUCK_POLICY"] = a.policy
     if a.weights:
         os.environ["YOLO_WEIGHTS"] = os.path.abspath(a.weights)
     rows = []
@@ -80,7 +83,7 @@ def main():
             ok, why = CHECKS[name](events)
             rows.append((name, k + 1, ok, why))
             print(f"{name} #{k+1}: {'PASS' if ok else 'FAIL'}  {why}", flush=True)
-    lines = [f"YOLO: {os.environ.get('YOLO_WEIGHTS', '既定')}", "", "| 場面 | 回 | 結果 | 内容 |", "|---|---|---|---|"]
+    lines = [f"YOLO: {os.environ.get('YOLO_WEIGHTS', '既定')} / 歩き方: {os.environ.get('DUCK_POLICY', 'velstand')}", "", "| 場面 | 回 | 結果 | 内容 |", "|---|---|---|---|"]
     lines += [f"| {n} | {k} | {'PASS' if ok else 'FAIL'} | {why} |" for n, k, ok, why in rows]
     stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     path = os.path.join(ROOT, "build", "runs", f"check_{stamp}.md")

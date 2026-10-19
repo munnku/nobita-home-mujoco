@@ -197,3 +197,32 @@ uv run python app/llm_agent.py "居間の様子を見てきて"
   - テスト画像は学習データと同じシミュレーション（同じ人のメッシュ・同じ家）で作った。
   - そのため、実物のカメラや別の人でこの精度が出るとは限らない。
   - 実物で使うなら、服装・体型・照明を増やすか、実写のデータを足す必要がある。
+
+## 歩き方の強化学習 (Microduck)
+- 公開の方策 (velstand) は、この家の MuJoCo (CPU) では速度指令の 1/3 ほどしか進まない (0.4 m/s の指令で 0.14 m/s)。
+  そのため家の中の移動に時間がかかっていた。
+- pollen-robotics/microduck_rl (mjlab = MuJoCo Warp、rsl_rl の PPO) で `Mjlab-Velocity-Flat-Backlash-MicroDuck` を学習した。
+  - GPU 付きの Docker (pai_mujoco) で、4096 環境 × 1500 回更新。1 回 約 6 秒、計 約 2.5 時間 (RTX 3060)。
+  - 学習曲線は `docs/learning/rl_curve.png`。報酬 0 → 117、転倒はほぼ 0、旋回の誤差はまだ下がり続けている。
+  - ONNX に書き出して `models/nobita_walk.onnx` に置いた (観測 61・行動 14 で、公開の方策と同じ形)。
+- 速度指令への追従 (`learning/eval_gait.py`、居間で各 6 秒):
+
+| 指令 | velstand (公開) | alpha_walking (公開) | nobita_walk (学習) |
+|---|---|---|---|
+| 前進 0.3 m/s | 0.096 | 0.120 | 0.111 |
+| 前進 0.4 m/s | 0.142 | 0.166 | **0.343** |
+| 旋回 1.0 rad/s | 0.96 | 0.03 | 0.48 |
+
+- 小さい指令 (0.2 m/s 以下) では足踏みになる。
+  → 方策ごとに前進の指令の上限と下限を決めた (sim/world.py の POLICY_SPEED。nobita_walk は 0.32〜0.4)。
+- 場面で比べる (`check_scenarios.py --policy ...`、学習後の YOLO)：
+
+| 場面 | velstand | nobita_walk |
+|---|---|---|
+| fall (倒れてから知らせまで) | 15.6 秒 | **10.6 秒** |
+| fall_ousetsu | 40.6 秒 | **23.6 秒** |
+| fall_dk | 54.8 秒 | **27.6 秒** |
+| homecoming (扉が開いてから迎えるまで) | 19.2 秒 | **12.2 秒** |
+
+- 既定は nobita_walk にした (`DUCK_POLICY=velstand` で公開の方策に戻せる)。
+- 今後：旋回の誤差がまだ下がっているので、学習を延長する。家の床 (畳・フローリング) の摩擦を学習の乱数に入れる。

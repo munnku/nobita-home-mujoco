@@ -19,7 +19,9 @@ def wrap(a):
 
 
 class Navigator:
-    def __init__(self):
+    def __init__(self, max_vx=MAX_VX, min_vx=0.0):
+        """max_vx / min_vx: 前進の指令の上限と下限 (方策によって、小さい指令では足踏みしかしないものがある)。"""
+        self.max_vx, self.min_vx = max_vx, min_vx
         self.stop()
 
     def set_path(self, path, goal_yaw=None, target=None, tolerance=None):
@@ -93,7 +95,7 @@ class Navigator:
                 if abs(err) > TURN_IN_PLACE:
                     return 0.0, math.copysign(MAX_WZ, err)
                 dist = math.hypot(gx - x, gy - y)
-                vx = min(MAX_VX, 0.12 + 0.5 * dist) * max(0.0, math.cos(err))
+                vx = max(self.min_vx, min(self.max_vx, 0.12 + 0.5 * dist)) * max(0.0, math.cos(err))
                 wz = max(-MAX_WZ, min(MAX_WZ, 2.0 * err))
                 return vx, wz
         # 着いた: 向きを合わせる

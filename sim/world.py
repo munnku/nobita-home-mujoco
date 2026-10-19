@@ -22,12 +22,20 @@ from scene import compose, person_pose
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_HOUSE = os.path.join(ROOT, "houses", "nobita")
 LIGHT_ON = np.array([0.45, 0.44, 0.40])
+# 歩き方の方策ごとの前進の指令の上限と下限 (learning/eval_gait.py で測った)
+#   velstand (公開): 指令の 1/3 ほどの速さ。nobita_walk (この家で強化学習): 0.4 で 0.34 m/s、0.2 以下では足踏み
+POLICY_SPEED = {"velstand": (0.3, 0.0), "alpha_walking": (0.3, 0.0), "nobita_walk": (0.4, 0.32)}
 MAX_RETRIES = 3       # 進まなくなったときに経路を作り直す回数
 
 
 class World:
     def __init__(self, house_dir=DEFAULT_HOUSE, duck_pose=(0.0, 0.0, 0.0), n_persons=2,
-                 policy="velstand"):
+                 policy=None):
+        # 既定は、この家で強化学習した歩き方 (models/nobita_walk.onnx) があればそれ、なければ公開の velstand
+        default = "nobita_walk" if os.path.exists(os.path.join(ROOT, "models", "nobita_walk.onnx")) else "velstand"
+        policy = policy or os.environ.get("DUCK_POLICY", default)
+        if policy == "nobita_walk":
+            policy = os.path.join(ROOT, "models", "nobita_walk.onnx")
         self.layout = load_layout(house_dir)
         self.module = self.layout["module"]
         spec, self.door_open_q = compose(house_dir, duck=True, n_persons=n_persons)
@@ -43,7 +51,9 @@ class World:
         duck_root = m.body_rootid[self.duck.trunk]
         ignore = [b for b in range(m.nbody) if m.body_rootid[b] == duck_root]
         self.map = FloorMap(m, self.data, self.layout["rooms"], self.module, ignore_bodies=ignore)
-        self.nav = Navigator()
+        key = os.path.splitext(os.path.basename(policy))[0]
+        self.nav = Navigator(*POLICY_SPEED.get(key, (0.3, 0.0)))
+        self.policy_name = key
         self.goal, self.retries, self.last_path = None, 0, None
         self.manual_cmd = (0.0, 0.0, 0.0)
         self.time = 0.0
