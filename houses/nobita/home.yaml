@@ -17,3 +17,19 @@ places:
   nobita_desk: {x: 8.0, y: 2.3, yaw: 0, level: 2F}
   nobita_futon: {x: 6.2, y: 2.0, yaw: 0, level: 2F}     # 布団で寝ている
   outside: null
+  genkan_in: {x: 11.2, y: 5.0, yaw: 180, level: 1F, dz: -0.2}   # 玄関の土間 (床より 20 cm 低い)
+
+# 起こす (起床の見守り)
+wake_up:
+  who: nobita
+  time: "07:00:00"
+  room: nobita
+  bed: [5.6, 8.3, 1.4, 2.8]              # 布団のあたり [xmin, xmax, ymin, ymax] (マス)
+  call_point: {x: 7.4, y: 4.6}           # アヒルが 2 階へ呼びかける場所 (階段の下)
+  retry_after: 30                        # 起きなければこの秒数後にもう一度、そのあとママに知らせる
+
+# 玄関
+entrance:
+  door: genkan
+  look_target: {x: 11.2, y: 5.0}         # 玄関の土間 (アヒルはここを見る)
+  auto_lock_after: 20                    # 閉まって鍵が開いたままならこの秒数後に施錠

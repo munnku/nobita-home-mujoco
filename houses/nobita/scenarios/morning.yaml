@@ -1,0 +1,11 @@
+# 朝 7 時になってものび太が起きない。部屋の照明とスピーカー、アヒルの呼びかけでも起きないのでママに知らせる
+name: morning
+description: のび太が 2 階の布団で寝ている。7:00 に起こす
+start_clock: "06:59:30"
+duration: 240
+events:
+  - {t: 0, who: nobita, at: nobita_futon, pose: lie}
+  - {t: 0, who: tamako, at: dk_kitchen, pose: stand}
+  - {t: 150, who: nobita, at: nobita_desk, pose: stand}     # やっと起きる
+  - {t: 175, who: nobita, at: rouka_mid, pose: stand}       # 1 階へ下りてくる
+  - {t: 195, who: nobita, at: dk_table, pose: stand}

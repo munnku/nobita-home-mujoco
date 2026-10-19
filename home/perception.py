@@ -3,6 +3,7 @@
 - 位置: 人の枠の下端の中央を通る視線と床 (z = 床の高さ) の交点 = 足元 (立っている人)
 - 姿勢: 枠の上端の視線も床に落とし、下端の点との距離 L を見る。横になった人なら L は身長くらい
   (LYING_LENGTH 以下)、立っている人なら上端の視線は頭の上を通ってずっと遠くの床に落ちる (または床に届かない)。
+  ただしカメラの真下近くに立つ人は縮んで見えて長さが短くなるので、頭の高さ (STAND_HEIGHT 以上) なら立っているとする。
   アヒルの頭のような低いカメラでは、体の上端の高さ (LYING_HEIGHT) で決める。
   上端が絵の外で切れていれば判定しない (unknown)。頭の高さ (足元の鉛直の面での高さ) は参考に出す
 - 横になっている人の位置: 枠の下端と上端の床への投影の中点 (体の真ん中)
@@ -18,6 +19,7 @@ YOLO_WEIGHTS = os.path.join(ROOT, "third_party", "yolov8s.pt")
 LYING_LENGTH = 2.6     # 枠の上端と下端の床への投影がこれより近ければ横になっている [m] (高いカメラ)
 LYING_HEIGHT = 0.8     # 体の上端がこれより低ければ横になっている [m] (低いカメラ)
 HIGH_CAMERA = 1.5      # これより高いカメラは天井のカメラとして扱う [m]
+STAND_HEIGHT = 1.5     # 天井のカメラで、足元の鉛直面での頭の高さがこれ以上なら立っている [m]
 MIN_SCORE = 0.4
 
 
@@ -110,7 +112,8 @@ def estimate_person(cam, box, floor_z=0.0, margin=4):
     elif not top_cut:
         far = cam.floor_point(uc, y1, floor_z)
         length = None if far is None else float(np.hypot(*(far[:2] - foot[:2])))
-        if length is not None and length < LYING_LENGTH:
+        # 長さが短くても、頭の高さが立った人の高さなら立っている (カメラの真下近くの人は縮んで見える)
+        if length is not None and length < LYING_LENGTH and (height is None or height < STAND_HEIGHT):
             posture = "lying"
             x, y = float((foot[0] + far[0]) / 2), float((foot[1] + far[1]) / 2)
         else:

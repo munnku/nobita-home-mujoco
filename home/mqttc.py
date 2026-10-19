@@ -23,6 +23,8 @@ class Mqtt:
 
     @staticmethod
     def _enc(payload):
+        if hasattr(payload, "item"):          # numpy の数や bool はふつうの値にする
+            payload = payload.item()
         if isinstance(payload, (dict, list)):
             return json.dumps(payload, ensure_ascii=False)
         if isinstance(payload, bool):

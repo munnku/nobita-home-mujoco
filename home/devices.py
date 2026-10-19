@@ -59,6 +59,14 @@ class HomeDevices:
                     "on": {"name": "点灯", "datatype": "boolean", "settable": True}}}},
                 on_set=lambda n, p, v, room=name: self.pending.put(("light", room, v)))
             self.lights[name].set("light", "on", world.light_is_on(name))
+        # スマートスピーカー (話す内容を home/speech に出す)
+        self.speakers = {}
+        for name in ("nobita", "dk", "ima"):
+            self.speakers[name] = HomieDevice(
+                mqtt, _dev_id("speaker", name), f"スマートスピーカー ({rooms[name]['label']})",
+                {"speaker": {"name": "スピーカー", "type": "speaker", "properties": {
+                    "say": {"name": "話す", "datatype": "string", "settable": True}}}},
+                on_set=lambda n, p, v, room=name: self.pending.put(("say", room, v)))
         # スマートロックと扉の開閉センサー
         self.locks = {}
         self.locked = {}
@@ -81,6 +89,10 @@ class HomeDevices:
             kind, name, value = self.pending.get()
             if kind == "light":
                 self.w.set_light(name, bool(value))
+            elif kind == "say":
+                self.m.publish("home/speech", {"speaker": f"speaker-{name}", "text": str(value), "room": name,
+                                               "time": round(self.w.time, 1)})
+                self.speakers[name].set("speaker", "say", str(value), force=True)
             elif kind == "lock":
                 self.locked[name] = bool(value)
                 if self.locked[name] and self.w.door_is_open(name):
@@ -113,7 +125,7 @@ class HomeDevices:
             dev.set("light", "on", self.w.light_is_on(name))
         for name, dev in self.locks.items():
             dev.set("lock", "locked", self.locked[name])
-            dev.set("contact", "open", self.w.door_is_open(name))
+            dev.set("contact", "open", bool(self.w.door_is_open(name)))
 
     def _cameras(self):
         cfg = self.cam_cfg
@@ -127,6 +139,10 @@ class HomeDevices:
             for b in bxs:
                 p = estimate_person(cam, b, floor_z)
                 if p:
+                    # 足元が床の高さの違う部屋 (玄関の土間) に落ちたら、その床の高さで計算し直す
+                    r = self.rooms.get(self.w.room_of(p["x"], p["y"], self.rooms[c["room"]]["level"]) or "")
+                    if r and r.get("z"):
+                        p = estimate_person(cam, b, floor_z + r["z"]) or p
                     p["box"] = [int(v) for v in b[:4]]
                     persons.append(p)
             self.cams[c["name"]].set("camera", "persons", persons, force=True)

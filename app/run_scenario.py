@@ -79,7 +79,10 @@ def main():
         elif e["topic"] == "home/alerts":
             print(f"  {p.get('time', 0):6.1f}s  [知らせ] {p}")
         elif e["topic"] == "home/speech":
-            print(f"  {p.get('time', 0):6.1f}s  [アヒル] {p.get('text')}")
+            who = "アヒル" if p.get("speaker") == "microduck-01" else p.get("speaker")
+            print(f"  {p.get('time', 0):6.1f}s  [{who}] {p.get('text')}")
+        elif e["topic"] == "sim/scenario" and "door" in p:
+            print(f"  {p.get('time', 0):6.1f}s  [人役] 扉 {p.get('door')}: {p.get('do')}")
         elif e["topic"] == "sim/scenario":
             print(f"  {p.get('time', 0):6.1f}s  [人役] {p.get('who')} → {p.get('at')} ({p.get('pose')})")
     print("saved", path)

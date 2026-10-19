@@ -1,0 +1,14 @@
+# のび太が学校から帰ってくる。鍵を開けて入り、閉め忘れる
+name: homecoming
+description: 玄関の鍵が開いて扉が開く → アヒルが迎えに行く。鍵の閉め忘れは自動で施錠
+start_clock: "15:00:00"
+duration: 180
+events:
+  - {t: 0, who: tamako, at: dk_kitchen, pose: stand}
+  - {t: 0, who: nobita, at: outside}
+  - {t: 20, door: genkan, do: unlock}
+  - {t: 22, door: genkan, do: open}
+  - {t: 24, who: nobita, at: genkan_in, pose: stand}
+  - {t: 30, door: genkan, do: close}
+  - {t: 90, who: nobita, at: rouka_mid, pose: stand}
+  - {t: 110, who: nobita, at: ima_center, pose: stand}

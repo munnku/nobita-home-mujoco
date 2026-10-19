@@ -47,13 +47,15 @@ def main():
     mq = Mqtt("sim-server", will=("sim/status", "offline"))
     devices = HomeDevices(w, mq, det, a.house)
     agent = Agent(w, mq, det)
-    scen = Scenario(w, mq, a.house, a.scenario)
+    scen = Scenario(w, mq, a.house, a.scenario, devices)
     duration = a.duration or scen.duration
     rec = None
     if a.record:
         from app.recorder import Recorder
         rec = Recorder(w, a.record)
         mq.subscribe("home/log", lambda t, p: rec.log(p.get("text", "") if isinstance(p, dict) else str(p)))
+        mq.subscribe("home/speech", lambda t, p: rec.log(f"[{p.get('speaker')}]「{p.get('text')}」")
+                     if isinstance(p, dict) and p.get("speaker") != "microduck-01" else None)
     viewer = None
     if a.viewer:
         import mujoco.viewer
@@ -72,6 +74,7 @@ def main():
         if w.time >= next_pub:
             next_pub = w.time + 1.0
             mq.publish("home/time", round(w.time, 1))
+            mq.publish("home/clock", scen.clock(), retain=True)
             mq.publish("sim/truth", {"time": round(w.time, 1), "persons": w.person_state,
                                      "robot": dict(zip(("x", "y", "theta"), (round(v, 2) for v in w.duck.pose()))),
                                      "fallen": bool(w.duck.fallen())})

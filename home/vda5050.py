@@ -369,8 +369,14 @@ class Agent:
             if run["best"] and run["best"]["posture"] != "unknown" and ts > 1.0:
                 self.w.set_manual_cmd(0.0, 0.0, 0.0)
                 return True, True, json.dumps({"found": True, **run["best"]}, ensure_ascii=False)
+        # 部屋を見回す (sweep=full) ときはゆっくり 1 周回る。見つけるまでは止まらない
+        if p.get("sweep") == "full":
+            if run["best"] is None or run["best"]["posture"] == "unknown":
+                self.w.set_manual_cmd(0.0, 0.0, 0.6)
+            else:
+                self.w.set_manual_cmd(0.0, 0.0, 0.0)
         # 見えないうちは左右に振る (±40°)
-        if run["best"] is None:
+        elif run["best"] is None:
             phase = math.sin(ts * 0.8)
             want = run["yaw0"] + 0.7 * phase
             err = (want - th + math.pi) % (2 * math.pi) - math.pi

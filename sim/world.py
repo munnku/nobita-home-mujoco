@@ -114,17 +114,17 @@ class World:
 
     def door_is_open(self, name):
         qa, _ = self._joint_adr(name)
-        return abs(self.data.qpos[qa]) > 0.1 * abs(self.door_open_q[name])
+        return bool(abs(self.data.qpos[qa]) > 0.1 * abs(self.door_open_q[name]))
 
     # ---- 人
-    def place_person(self, i, x, y, yaw=0.0, pose="stand", level="1F", update_map=True):
+    def place_person(self, i, x, y, yaw=0.0, pose="stand", level="1F", update_map=True, dz=0.0):
         """人 i を (x, y) [m] に置く。pose: stand / lie。家の外へ出すときは x=None。"""
         b = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, f"person{i}")
         mid = self.model.body_mocapid[b]
         if x is None:
             pos, quat = person_pose(-1.5 - i, -2.5, 0.0, "stand", floor_z=-0.45)
         else:
-            pos, quat = person_pose(x, y, yaw, pose, self.layout["levels"][level]["z"])
+            pos, quat = person_pose(x, y, yaw, pose, self.layout["levels"][level]["z"] + dz)
         self.data.mocap_pos[mid] = pos
         self.data.mocap_quat[mid] = quat
         # 見せ方の group: 1 階の人は 1、2 階の人は 2 階と同じ 4 (1 階の見下ろしで浮いて見えないように)

@@ -20,6 +20,11 @@ dependencies = [
     "amqtt>=0.12.1",
     "torch==2.9.1",
     "torchvision",
+    "fastapi>=0.146.0",
+    "uvicorn>=0.54.0",
+    "requests>=2.34.2",
+    "jsonschema>=4.26.0",
+    "anthropic>=1.15.0",
 ]
 
 [tool.uv]
