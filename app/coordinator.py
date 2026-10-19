@@ -5,6 +5,8 @@
   アヒルが人を見通せる所へ行って確かめ (detectObject)、家族に知らせて声をかける。立っていれば誤報として取り消す
 - 起床 (wake_up): 起きる時刻に布団で横になっていれば、部屋の照明とスピーカーで起こし、アヒルが階段の下から呼ぶ。
   しばらくして起きなければ、もう一度呼んでから、アヒルがママ (1 階で立っている人) のところへ知らせに行く
+- 照明 (lights): 人感センサーが LIGHT_OFF_AFTER 秒続けて「人がいない」部屋の照明がついていれば消す (消し忘れ)。
+  人が入ってきたら (人感センサーが反応したら) つける
 - 玄関 (entrance): 鍵が開いて扉が開いたら、アヒルが玄関を見に行き、人がいれば「おかえりなさい」。
   扉が閉まったまま鍵が開いていれば、しばらくして施錠し、スピーカーで知らせる
 時刻はシミュレーションの時刻 (home/time) と家の時計 (home/clock) を使う。
@@ -27,8 +29,10 @@ from home.vda5050 import action, make_order, topic  # noqa: E402
 HOUSE = os.path.join(ROOT, "houses", "nobita")
 M = 0.91
 FALL_CONFIRM = 3.0     # 横になった人をこれだけ続けて見たら疑う [s]
+LIGHT_OFF_AFTER = 60.0  # 人のいない部屋の照明をこれだけ待って消す [s]
 SAME_PLACE = 1.0       # 同じ人とみなす距離 [m]
-LABEL = {"dk": "DK", "ima": "居間", "ousetsu": "応接室", "rouka": "廊下", "nobita": "のび太の部屋", "genkan": "玄関"}
+LABEL = {"dk": "DK", "ima": "居間", "ousetsu": "応接室", "rouka": "廊下", "nobita": "のび太の部屋", "genkan": "玄関",
+         "senmen": "洗面所"}
 
 
 def secs(clock):
@@ -84,6 +88,9 @@ class Coordinator:
         s("homie/+/lock/locked", lambda t, p: self.locked.__setitem__(t.split("/")[1][5:], str(p).lower() == "true"))
         s("homie/+/contact/open", lambda t, p: self.door_open.__setitem__(t.split("/")[1][5:], str(p).lower() == "true"))
         s(topic("state"), lambda t, p: self.robot.update(p))
+        self.motion, self.light_on, self.empty_since = {}, {}, {}
+        s("homie/+/sensor/motion", lambda t, p: self.motion.__setitem__(t.split("/")[1][7:], str(p).lower() == "true"))
+        s("homie/+/light/on", lambda t, p: self.light_on.__setitem__(t.split("/")[1][6:], str(p).lower() == "true"))
         self.requests = []
         s("home/coordinator/requests", lambda t, p: self.requests.append(p))
 
@@ -136,6 +143,7 @@ class Coordinator:
         self.rule_fall()
         self.rule_wake_up()
         self.rule_entrance()
+        self.rule_lights()
         self.run_jobs()
 
     # ---- 仕事を進める
@@ -339,6 +347,25 @@ class Coordinator:
                 if p["posture"] == "standing" and (best is None or room == "dk"):
                     best = (room, p)
         return best
+
+    # ---- 照明の消し忘れ
+    def rule_lights(self):
+        for room, on in list(self.light_on.items()):
+            occupied = self.motion.get(room)
+            if occupied and not on:
+                self.light(room, True)
+                self.light_on[room] = True
+                self.log(f"{LABEL.get(room, room)}に人が来た (人感センサー) → 照明をつけた", kind="light_on")
+                continue
+            if not on or occupied is None or occupied:
+                self.empty_since.pop(room, None)
+                continue
+            since = self.empty_since.setdefault(room, self.time)
+            if self.time - since >= LIGHT_OFF_AFTER:
+                self.light(room, False)
+                self.light_on[room] = False
+                self.empty_since.pop(room, None)
+                self.log(f"{LABEL.get(room, room)}に {LIGHT_OFF_AFTER:.0f} 秒だれもいない → 照明を消した", kind="light_off")
 
     # ---- 玄関
     def rule_entrance(self):
