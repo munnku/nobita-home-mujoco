@@ -30,7 +30,7 @@ HOUSE = os.path.join(ROOT, "houses", "nobita")
 M = 0.91
 FALL_CONFIRM = 3.0     # 横になった人をこれだけ続けて見たら疑う [s]
 LIGHT_OFF_AFTER = 60.0  # 人のいない部屋の照明をこれだけ待って消す [s]
-SAME_PLACE = 1.0       # 同じ人とみなす距離 [m]
+SAME_PLACE = 1.5       # 同じ人とみなす距離 [m] (2 台のカメラの推定は 1 m ほどずれることがある)
 LABEL = {"dk": "DK", "ima": "居間", "ousetsu": "応接室", "rouka": "廊下", "nobita": "のび太の部屋", "genkan": "玄関",
          "senmen": "洗面所"}
 
@@ -130,12 +130,13 @@ class Coordinator:
         for p in persons:
             if p.get("posture") != "lying" or room == self.home["wake_up"]["room"]:
                 continue        # 寝室の布団で横になっているのは転倒ではない (起床の決まりで見る)
+            where = p.get("room") or room     # 人がいる部屋 (カメラの部屋とは限らない。ふすま越しに見えることがある)
             for c in self.lying:
                 if math.hypot(c["x"] - p["x"], c["y"] - p["y"]) < SAME_PLACE:
                     c.update(x=p["x"], y=p["y"], last=self.time)
                     break
             else:
-                self.lying.append({"x": p["x"], "y": p["y"], "room": room, "first": self.time, "last": self.time})
+                self.lying.append({"x": p["x"], "y": p["y"], "room": where, "first": self.time, "last": self.time})
 
     # ---- 毎回
     def step(self):

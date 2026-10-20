@@ -144,10 +144,14 @@ class HomeDevices:
                     if r and r.get("z"):
                         p = estimate_person(cam, b, floor_z + r["z"]) or p
                     else:
-                        # 推定はカメラの部屋の中 (壁から 0.25 m 内側) に収める。壁の向こうや壁際に出ることがある
-                        x0, x1, y0, y1 = (v * self.w.module for v in self.rooms[c["room"]]["rect"])
+                        # 推定を部屋の中 (壁から 0.25 m 内側) に収める。壁際の人は壁の向こうに推定されることがある。
+                        # 推定が入っている部屋に収める (開いた扉やふすま越しに隣の部屋の人が見えることもあるので、
+                        # カメラの部屋に押し込まない)。どの部屋にも入っていなければカメラの部屋に収める
+                        home_room = r if r is not None else self.rooms[c["room"]]
+                        x0, x1, y0, y1 = (v * self.w.module for v in home_room["rect"])
                         p["x"] = round(min(max(p["x"], x0 + 0.25), x1 - 0.25), 2)
                         p["y"] = round(min(max(p["y"], y0 + 0.25), y1 - 0.25), 2)
+                    p["room"] = self.w.room_of(p["x"], p["y"], self.rooms[c["room"]]["level"]) or c["room"]
                     p["box"] = [int(v) for v in b[:4]]
                     persons.append(p)
             self.cams[c["name"]].set("camera", "persons", persons, force=True)

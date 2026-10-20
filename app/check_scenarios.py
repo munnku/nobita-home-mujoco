@@ -85,7 +85,7 @@ def main():
             ok, why = CHECKS[name](events)
             rows.append((name, k + 1, ok, why))
             print(f"{name} #{k+1}: {'PASS' if ok else 'FAIL'}  {why}", flush=True)
-    lines = [f"YOLO: {os.environ.get('YOLO_WEIGHTS', '既定')} / 歩き方: {os.environ.get('DUCK_POLICY', 'velstand')}", "", "| 場面 | 回 | 結果 | 内容 |", "|---|---|---|---|"]
+    lines = [f"YOLO: {os.environ.get('YOLO_WEIGHTS', '既定')} / 歩き方: {os.environ.get('DUCK_POLICY', '既定 (nobita_walk)')}", "", "| 場面 | 回 | 結果 | 内容 |", "|---|---|---|---|"]
     lines += [f"| {n} | {k} | {'PASS' if ok else 'FAIL'} | {why} |" for n, k, ok, why in rows]
     stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     path = os.path.join(ROOT, "build", "runs", f"check_{stamp}.md")
