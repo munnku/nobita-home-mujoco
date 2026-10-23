@@ -1,0 +1,16 @@
+# のび太がトイレに長くいる。アヒルが扉の前で声をかけると返事があるので、待つ
+name: toilet_long
+description: のび太がトイレに長くいる (返事があるので待つ)
+mode: alone
+duration: 140
+events:
+  - {t: 0, who: tamako, at: outside}
+  - {t: 0, who: nobita, at: ima_center, pose: stand}
+  - {t: 5, who: nobita, at: toilet_door, pose: stand, walk: true, speed: 0.6}
+  - {t: 14, door: toilet, do: open}
+  - {t: 15, who: nobita, at: toilet_in, pose: stand}
+  - {t: 16, door: toilet, do: close}
+replies:
+  nobita:
+    ask_ok: {say: "いまトイレー！もうすぐでるよ", delay: 1.5}
+    default: null

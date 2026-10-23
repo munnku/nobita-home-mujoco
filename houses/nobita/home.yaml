@@ -20,6 +20,12 @@ places:
   nobita_futon: {x: 6.2, y: 2.0, yaw: 0, level: 2F}     # 布団で寝ている
   outside: null
   genkan_in: {x: 11.2, y: 5.0, yaw: 180, level: 1F, dz: -0.2}   # 玄関の土間 (床より 20 cm 低い)
+  dk_stove: {x: 1.15, y: 3.5, yaw: 180, level: 1F}     # 台所のコンロの前
+  genkan_edge: {x: 10.2, y: 5.0, yaw: 0, level: 1F}    # 玄関の上がり框 (廊下の東の端)
+  bath_front: {x: 5.0, y: 6.45, yaw: 90, level: 1F}    # 浴室の中、浴槽の前
+  senmen_fall: {x: 6.15, y: 6.6, yaw: 0, level: 1F}    # 脱衣所で倒れる (洗面台・洗濯機の手前。廊下のカメラから見えない)
+  toilet_door: {x: 8.5, y: 5.4, yaw: 90, level: 1F}    # トイレの扉の前 (廊下)
+  toilet_in: {x: 8.5, y: 6.7, yaw: -90, level: 1F}     # トイレの中
 
 # 起こす (起床の見守り)
 wake_up:
@@ -35,3 +41,30 @@ entrance:
   door: genkan
   look_target: {x: 11.2, y: 5.0}         # 玄関の土間 (アヒルはここを見る)
   auto_lock_after: 20                    # 閉まって鍵が開いたままならこの秒数後に施錠
+
+# おるすばんのときの危ない場所 (先読みして止めに行く)。rect [xmin, xmax, ymin, ymax] (マス)
+# speaker: 子どものいる部屋にスピーカーが無いときに使うスピーカー
+# severity: 危なさの重み (確率 × severity で備える・警告するかを決める。外へ出る・お風呂は低い確率でも早めに動く)
+hazards:
+  - {name: stove, label: コンロ, rect: [0.85, 1.5, 3.0, 4.1], speaker: dk, severity: 1.0,
+     say: "のび太くん、コンロはあぶないよ！さわらないでね！", say_walk: "コンロに近づかないで！", say_near: "火はあぶないよ。おやつはテーブルで食べようね。"}
+  - {name: genkan, label: 玄関, rect: [10.5, 12.0, 4.0, 6.0], speaker: rouka, severity: 1.5,      # 土間 (下りると外へ出られる)
+     say: "のび太くん、ひとりで外に出ちゃだめだよ！", say_walk: "まって！外に出ないで！", say_near: "ママが帰るまで、おうちで待っていようね。"}
+  - {name: bath, label: お風呂, rect: [4.1, 5.9, 6.1, 6.9], speaker: rouka, severity: 1.5,
+     say: "のび太くん、ひとりでお風呂に入っちゃだめだよ！", say_walk: "お風呂はあぶないよ！", say_near: "お風呂はママが帰ってからにしようね。"}
+  - {name: stairs, label: 階段, rect: [5.0, 7.0, 4.0, 5.0], speaker: rouka, severity: 0.6,
+     say: "階段は走らないで、ゆっくりね！", say_walk: "ゆっくりね！", say_near: "手すりを持ってね。"}
+# ふつうの行き先 (行き先の推定で、危ない場所と比べる候補)。x y はマス
+everyday_spots:
+  ima: [6.0, 3.0]
+  ousetsu: [10.6, 3.3]
+  dk_table: [2.4, 4.7]
+  rouka: [8.0, 5.0]
+  senmen: [7.0, 6.7]
+  toilet: [8.5, 6.6]
+# カメラを置かない部屋 (人感センサーだけ)。x y はマス。max_stay: これより長くいたらアヒルが声をかけに行く [s]
+# (場面を短くするため短くしてある。実際の家では脱衣所 15 分・トイレ 20 分など)
+blind_rooms:
+  senmen: {door: senmen, stand: [6.55, 5.45], inside: [7.0, 6.5], max_stay: 40}
+  toilet: {door: toilet, stand: [8.5, 5.45], inside: [8.5, 6.5], max_stay: 60}
+  yokushitsu: {door: yokushitsu, stand: [6.5, 6.5], inside: [5.3, 6.45], max_stay: 40}

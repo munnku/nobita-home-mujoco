@@ -53,8 +53,60 @@ def check_homecoming(events):
     return ok, f"扉 {t_open}s / 迎える {t_greet}s / 施錠 {t_lock}s / 転倒の誤報 {'あり' if false_fall else 'なし'}"
 
 
-CHECKS = {"fall": check_fall, "morning": check_morning, "homecoming": check_homecoming,
-          "fall_ousetsu": check_fall, "fall_dk": check_fall}
+def check_report(want):
+    """転んだ子どもに声をかけ、返事と様子から決めた知らせの重さが want か。"""
+    def check(events):
+        ok, why = check_fall(events)
+        rep = next((e["payload"] for e in events if e["topic"] == "home/alerts"
+                    and e["payload"].get("type") == "fall_report"), None)
+        if rep is None:
+            return False, why + " / 判断の知らせが無い"
+        replies = " → ".join(r.get("text") or "(無言)" for r in rep.get("replies", []))
+        return ok and rep["level"] == want, (f"{why} / 判断 {rep['level']} (期待 {want}, {rep.get('by')}) "
+                                            f"{rep.get('reason')} / 返事: {replies}")
+    return check
+
+
+def check_danger(hazard):
+    """危ない場所 (hazard) へ向かう子どもを、入る前に先読みして (備える・警告する) 止められたか。"""
+    def check(events):
+        logs = [e["payload"] for e in events if e["topic"] == "home/log" and isinstance(e["payload"], dict)]
+        prep = next((p for p in logs if p.get("kind") == "predict_prepare" and p.get("hazard") == hazard), None)
+        warn = next((p for p in logs if p.get("kind") == "predict_hazard" and p.get("hazard") == hazard), None)
+        stop = next((e["payload"] for e in events if e["topic"] == "sim/scenario"
+                     and e["payload"].get("stopped")), None)
+        entered = [e["payload"] for e in events if e["topic"] == "sim/scenario"
+                   and e["payload"].get("hazard_entered") == hazard]
+        start = next((e["payload"]["time"] for e in events if e["topic"] == "sim/scenario"
+                      and e["payload"].get("walk")), None)
+        ok = (warn or prep) is not None and not entered and stop is not None
+        def t(p):
+            return f"{p['time']:.1f}s (確率 {p.get('p')}、あと {p.get('dist')} m)" if p else "なし"
+        return ok, (f"歩き始め {start}s / 備える {t(prep)} / 警告 {t(warn)} / "
+                    f"止まった {stop['time'] if stop else 'なし'}s / 危ない場所に入った {'あり' if entered else 'なし'}")
+    return check
+
+
+def check_blind(want_level, want_kind):
+    """カメラの無い部屋: アヒルが声をかけに行き、want_kind (blind_ok / blind_lying など) になって、
+    知らせが want_level (None なら知らせなし) か。"""
+    def check(events):
+        ks = kinds(events)
+        t_check, t_kind = first(ks, "blind_check"), first(ks, want_kind)
+        alerts = [e["payload"] for e in events if e["topic"] == "home/alerts" and e["payload"].get("type") == "no_reply"]
+        level = alerts[0]["level"] if alerts else None
+        ok = t_check is not None and t_kind is not None and level == want_level
+        return ok, (f"声をかけに行く {t_check}s / {want_kind} {t_kind}s / 知らせ {level} (期待 {want_level})"
+                    + (f" 「{alerts[0]['summary']}」" if alerts else ""))
+    return check
+
+
+CHECKS = {"senmen_silent": check_blind("emergency", "blind_lying"), "toilet_long": check_blind(None, "blind_ok"),
+          "danger_stove": check_danger("stove"), "danger_genkan": check_danger("genkan"),
+          "danger_bath": check_danger("bath"),
+          "fall": check_fall, "morning": check_morning, "homecoming": check_homecoming,
+          "fall_ousetsu": check_fall, "fall_dk": check_fall,
+          "fall_ok": check_report("info"), "fall_hurt": check_report("warn"), "fall_silent": check_report("emergency")}
 
 
 def main():
@@ -74,8 +126,10 @@ def main():
     for name in a.only:
         for k in range(a.repeat):
             before = set(glob.glob(os.path.join(ROOT, "build", "runs", f"{name}_*.json")))
-            subprocess.run([PY, os.path.join(ROOT, "app", "run_scenario.py"), "--scenario", name, "--speed", a.speed],
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            log = os.path.join(ROOT, "build", "runs", f"{name}_{datetime.datetime.now():%Y%m%d_%H%M%S}.log")
+            with open(log, "w", encoding="utf-8") as lf:     # 司令塔・シミュレーションの出力 (うまくいかなかったときに見る)
+                subprocess.run([PY, os.path.join(ROOT, "app", "run_scenario.py"), "--scenario", name, "--speed", a.speed],
+                               stdout=lf, stderr=subprocess.STDOUT, env={**os.environ, "PYTHONUTF8": "1"})
             new = sorted(set(glob.glob(os.path.join(ROOT, "build", "runs", f"{name}_*.json"))) - before)
             if not new:
                 rows.append((name, k + 1, False, "実行できなかった"))

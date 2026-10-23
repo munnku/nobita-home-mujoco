@@ -1,0 +1,13 @@
+# のび太が DK から玄関へ向かい、上がり框で靴をはいて、ひとりで外へ出ようとする。
+# 1 回目の警告は聞かず、アヒルが近くに来ると止まる (止められなければ土間に下りる)
+name: danger_genkan
+description: のび太がひとりで外へ出ようとする (先読みして止める)
+mode: alone
+duration: 120
+events:
+  - {t: 0, who: tamako, at: outside}
+  - {t: 0, who: nobita, at: dk_table, pose: stand}
+  - {t: 10, who: nobita, at: genkan_edge, pose: stand, walk: true, speed: 0.6}
+  - {t: 34, who: nobita, at: genkan_in, pose: stand, unless_stopped: true}     # 靴をはいて土間に下りる
+react:
+  nobita: {on: warn, ignore: 1, delay: 1.0, near: 1.2}

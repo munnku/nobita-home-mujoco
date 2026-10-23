@@ -43,7 +43,7 @@ def main():
             time.sleep(0.1)
     events = []
     m = Mqtt("run-scenario")
-    for pat in ("home/alerts", "home/log", "home/speech", "sim/scenario"):
+    for pat in ("home/alerts", "home/log", "home/speech", "home/voice", "sim/scenario"):
         m.subscribe(pat, lambda t, p: events.append({"topic": t, "payload": p}))
     truth = {}
     m.subscribe("sim/truth", lambda t, p: truth.update(p))
@@ -78,6 +78,8 @@ def main():
             print(f"  {p.get('time', 0):6.1f}s  {p.get('text')}")
         elif e["topic"] == "home/alerts":
             print(f"  {p.get('time', 0):6.1f}s  [知らせ] {p}")
+        elif e["topic"] == "home/voice":
+            print(f"  {p.get('time', 0):6.1f}s  [{p.get('who')}]「{p.get('text')}」")
         elif e["topic"] == "home/speech":
             who = "アヒル" if p.get("speaker") == "microduck-01" else p.get("speaker")
             print(f"  {p.get('time', 0):6.1f}s  [{who}] {p.get('text')}")

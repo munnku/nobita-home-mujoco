@@ -1,0 +1,12 @@
+# 居間で倒れたのび太が返事をしない (頭を打って気を失った想定) → emergency (すぐ連絡)
+name: fall_silent
+description: 居間で倒れたのび太が返事をしない
+duration: 200
+events:
+  - {t: 0, who: tamako, at: outside}
+  - {t: 0, who: nobita, at: rouka_mid, pose: stand}
+  - {t: 8, who: nobita, at: ima_center, pose: stand, walk: true}
+  - {t: 20, who: nobita, at: ima_fall, pose: lie}
+replies:
+  nobita:
+    default: null

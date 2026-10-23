@@ -4,6 +4,8 @@
 - 人感センサー: 部屋ごと。人役がその部屋にいれば motion = true (焦電センサーの代わり)
 - 照明: 部屋ごと。on を /set で切り替えると MuJoCo の照明が点く・消える
 - スマートロック: 玄関と勝手口。locked を /set で切り替える。扉の開閉センサー (open) も出す
+- 見守りカメラのマイク: 同じ部屋の人の声 (home/voice) を audio/heard に出す (声は文字で表す)
+- 扉の開閉センサー: 鍵の無い扉 (脱衣所・トイレなど) が開いているか (contact/open)
 MQTT からの書き込みは受信スレッドで来るので、キューにためてシミュレーションのスレッドで反映する。
 """
 import os
@@ -30,6 +32,7 @@ class HomeDevices:
         rooms = {r["name"]: r for r in world.layout["rooms"]}
         self.rooms = rooms
         self.next_cam_t = 0.0
+        mqtt.subscribe("home/voice", lambda t, p: self.pending.put(("voice", None, p)) if isinstance(p, dict) else None)
         self.next_sensor_t = 0.0
         self.latest = {}          # カメラ名 → (時刻, 検出のリスト)、録画の重ね描き用
         self.latest_images = {}
@@ -42,6 +45,9 @@ class HomeDevices:
                     "persons": {"name": "見つけた人 (位置 m・姿勢)", "datatype": "string", "format": "json"},
                     "count": {"name": "人数", "datatype": "integer"},
                     "room": {"name": "部屋", "datatype": "string"},
+                }},
+                "audio": {"name": "マイク", "type": "microphone", "properties": {
+                    "heard": {"name": "聞こえた声 (だれ・文)", "datatype": "string", "format": "json"},
                 }}})
             self.cams[c["name"]].set("camera", "room", c["room"])
         # 人感センサー
@@ -61,7 +67,7 @@ class HomeDevices:
             self.lights[name].set("light", "on", world.light_is_on(name))
         # スマートスピーカー (話す内容を home/speech に出す)
         self.speakers = {}
-        for name in ("nobita", "dk", "ima"):
+        for name in ("nobita", "dk", "ima", "rouka"):
             self.speakers[name] = HomieDevice(
                 mqtt, _dev_id("speaker", name), f"スマートスピーカー ({rooms[name]['label']})",
                 {"speaker": {"name": "スピーカー", "type": "speaker", "properties": {
@@ -82,6 +88,14 @@ class HomeDevices:
                      "open": {"name": "開いている", "datatype": "boolean"}}}},
                 on_set=lambda n, p, v, door=name: self.pending.put(("lock", door, v)))
             self.locks[name].set("lock", "locked", True)
+        # 扉の開閉センサー (鍵の無い扉)
+        self.doors = {}
+        for name, d in world.layout["doors"].items():
+            if d.get("lock"):
+                continue
+            self.doors[name] = HomieDevice(mqtt, _dev_id("door", name), f"扉の開閉センサー ({name})", {
+                "contact": {"name": "開閉センサー", "type": "contact", "properties": {
+                    "open": {"name": "開いている", "datatype": "boolean"}}}})
 
     # ---- シミュレーションのスレッドから毎回呼ぶ
     def tick(self):
@@ -90,9 +104,18 @@ class HomeDevices:
             if kind == "light":
                 self.w.set_light(name, bool(value))
             elif kind == "say":
-                self.m.publish("home/speech", {"speaker": f"speaker-{name}", "text": str(value), "room": name,
-                                               "time": round(self.w.time, 1)})
-                self.speakers[name].set("speaker", "say", str(value), force=True)
+                # 値は文か {"text", "intent"} (intent は問いかけ・警告の種類。人役の反応に使う)
+                text, intent = (value.get("text", ""), value.get("intent")) if isinstance(value, dict) else (value, None)
+                msg = {"speaker": f"speaker-{name}", "text": str(text), "room": name, "time": round(self.w.time, 1),
+                       "duration": round(1.0 + 0.12 * len(str(text)), 1)}
+                if intent:
+                    msg["intent"] = intent
+                self.m.publish("home/speech", msg)
+                self.speakers[name].set("speaker", "say", str(text), force=True)
+            elif kind == "voice":
+                for c in self.cam_cfg["cameras"]:
+                    if c["room"] == value.get("room"):
+                        self.cams[c["name"]].set("audio", "heard", value, force=True)
             elif kind == "lock":
                 self.locked[name] = bool(value)
                 if self.locked[name] and self.w.door_is_open(name):
@@ -125,6 +148,8 @@ class HomeDevices:
             dev.set("light", "on", self.w.light_is_on(name))
         for name, dev in self.locks.items():
             dev.set("lock", "locked", self.locked[name])
+            dev.set("contact", "open", bool(self.w.door_is_open(name)))
+        for name, dev in self.doors.items():
             dev.set("contact", "open", bool(self.w.door_is_open(name)))
 
     def _cameras(self):

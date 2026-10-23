@@ -1,0 +1,12 @@
+# ひとりで留守番中ののび太が、居間から台所のコンロへ向かう。司令塔が行き先を先読みし、アヒルが先回りして止める
+name: danger_stove
+description: のび太が居間から台所のコンロへ向かう (先読みして止める)
+mode: alone
+duration: 120
+events:
+  - {t: 0, who: tamako, at: outside}
+  - {t: 0, who: nobita, at: ima_center, pose: stand}
+  - {t: 10, who: nobita, at: dk_stove, pose: stand, walk: true, speed: 0.6}
+# 警告が聞こえたら 1 秒で止まる
+react:
+  nobita: {on: warn, ignore: 0, delay: 1.0}

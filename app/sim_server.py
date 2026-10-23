@@ -63,6 +63,8 @@ def main():
         mq.subscribe("home/log", on_log)
         mq.subscribe("home/speech", lambda t, p: rec.log(f"[{p.get('speaker')}]「{p.get('text')}」")
                      if isinstance(p, dict) and p.get("speaker") != "microduck-01" else None)
+        mq.subscribe("home/voice", lambda t, p: rec.log(f"[{p.get('who')}]「{p.get('text')}」")
+                     if isinstance(p, dict) else None)
     viewer = None
     if a.viewer:
         import mujoco.viewer

@@ -4,15 +4,21 @@
 使う範囲:
 - order: nodes (nodePosition x, y, theta, allowedDeviationXY) と edges。ノードを順にたどり、着いたらノードの actions を順に行う
 - actions: detectObject (VDA 5050 の定義済みアクション。objectType=person、頭のカメラと YOLO で人を探す)、
-           speak (この家で足したアクション。話す内容を home/speech に出す)、wait
-- instantActions: cancelOrder, startPause, stopPause, stateRequest, factsheetRequest
+           speak (この家で足したアクション。話す内容を home/speech に出す。intent は問いの種類)、
+           listen (この家で足したアクション。マイクで duration 秒聞き、聞こえた声を返す)、wait
+- instantActions: cancelOrder, startPause, stopPause, stateRequest, factsheetRequest、
+  speak / listen / detectObject (いまの場所で行う。blockingType=NONE の speak は移動を止めずにすぐ話す)
+- detectObject で人を見つけたら、その絵を build/alerts/ に残し、結果に image として書く (privacy=true なら残さない)
 - state: 1 秒ごとと変化したとき。agvPosition, driving, nodeStates, edgeStates, actionStates, errors など
 アヒルが自分で経路を作る (地図の上の A*) ので、ノードは「行き先」だけでよい。
 """
 import datetime
 import json
 import math
+import os
 import queue
+
+import numpy as np
 
 from .perception import CameraModel, estimate_person
 
@@ -20,6 +26,9 @@ VERSION = "2.0.0"
 MANUFACTURER = "NobitaHome"
 SERIAL = "microduck-01"
 MAP_ID = "nobita-1F"
+HEAR_RADIUS = 4.0     # アヒルのマイクに声が届く距離 [m] (同じ部屋ならこれより遠くても届く)
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ALERT_DIR = os.path.join(ROOT, "build", "alerts")
 
 
 def topic(name, manufacturer=MANUFACTURER, serial=SERIAL):
@@ -78,6 +87,8 @@ class Agent:
         self.speech = None          # (話し終わる時刻, 文)
         self.m.subscribe(topic("order"), lambda t, p: self.inbox.put(("order", p)))
         self.m.subscribe(topic("instantActions"), lambda t, p: self.inbox.put(("instant", p)))
+        self.voices = []            # 聞こえた声 (home/voice) [(シミュレーションの時刻, 声)]
+        self.m.subscribe("home/voice", lambda t, p: self.inbox.put(("voice", p)) if isinstance(p, dict) else None)
         self.m.publish(topic("connection"), self._hdr({"connectionState": "ONLINE"}), retain=True, qos=1)
         self.publish_factsheet()
 
@@ -88,7 +99,8 @@ class Agent:
         if self.driving:
             return "移動中"
         if self.action_run is not None:
-            return {"detectObject": "人を確かめている", "speak": "話している", "wait": "待っている"}.get(
+            return {"detectObject": "人を確かめている", "speak": "話している", "listen": "聞いている",
+                    "wait": "待っている"}.get(
                 self.action_run.get("type"), "作業中")
         return "待機"
 
@@ -112,10 +124,15 @@ class Agent:
                  "actionParameters": [{"key": "objectType", "valueDataType": "STRING"},
                                       {"key": "targetX", "valueDataType": "FLOAT", "isOptional": True},
                                       {"key": "targetY", "valueDataType": "FLOAT", "isOptional": True},
-                                      {"key": "duration", "valueDataType": "FLOAT", "isOptional": True}],
-                 "resultDescription": "JSON: found, score, posture, x, y"},
+                                      {"key": "duration", "valueDataType": "FLOAT", "isOptional": True},
+                                      {"key": "privacy", "valueDataType": "BOOLEAN", "isOptional": True}],
+                 "resultDescription": "JSON: found, score, posture, x, y, image"},
                 {"actionType": "speak", "actionScopes": ["NODE", "INSTANT"],
-                 "actionParameters": [{"key": "text", "valueDataType": "STRING"}]},
+                 "actionParameters": [{"key": "text", "valueDataType": "STRING"},
+                                      {"key": "intent", "valueDataType": "STRING", "isOptional": True}]},
+                {"actionType": "listen", "actionScopes": ["NODE", "INSTANT"],
+                 "actionParameters": [{"key": "duration", "valueDataType": "FLOAT", "isOptional": True}],
+                 "resultDescription": "JSON: heard [{who, text, time}]"},
                 {"actionType": "wait", "actionScopes": ["NODE"],
                  "actionParameters": [{"key": "duration", "valueDataType": "FLOAT"}]},
                 {"actionType": "cancelOrder", "actionScopes": ["INSTANT"]},
@@ -157,6 +174,9 @@ class Agent:
             kind, msg = self.inbox.get()
             if kind == "order":
                 self._on_order(msg)
+            elif kind == "voice":
+                self.voices.append((self.w.time, msg))
+                self.voices = [v for v in self.voices if self.w.time - v[0] < 30.0]
             else:
                 for a in msg.get("actions", []):
                     self._on_instant(a)
@@ -230,7 +250,10 @@ class Agent:
         elif t == "factsheetRequest":
             self.publish_factsheet()
             self._set_action_state(a, "FINISHED")
-        elif t in ("speak", "detectObject"):
+        elif t == "speak" and a.get("blockingType") == "NONE":
+            self._speak(params(a))          # 移動を止めずにすぐ話す
+            self._set_action_state(a, "FINISHED")
+        elif t in ("speak", "detectObject", "listen"):
             # 即時のアクションとしても受け付ける (いまの場所で行う)
             self.order = self.order or {"orderId": f"instant-{a['actionId']}", "orderUpdateId": 0,
                                         "nodes": [], "edges": []}
@@ -327,15 +350,11 @@ class Agent:
     def _start_action(self, a):
         p = params(a)
         t = a["actionType"]
-        run = {"t0": self.w.time, "p": p, "type": t}
+        run = {"t0": self.w.time, "p": p, "type": t, "id": a["actionId"]}
         if t == "speak":
-            text = str(p.get("text", ""))
-            dur = 1.0 + 0.12 * len(text)
-            self.speech = (self.w.time + dur, text)
-            x, y, _ = self.w.duck.pose()
-            self.m.publish("home/speech", {"speaker": SERIAL, "text": text, "room": self.w.room_of(x, y),
-                                           "time": round(self.w.time, 1)})
-            run["dur"] = dur
+            run["dur"] = self._speak(p)
+        elif t == "listen":
+            run.update(dur=float(p.get("duration", 8.0)), heard=[])
         elif t == "detectObject":
             run.update(best=None, next_look=0.0, phase="face", dur=float(p.get("duration", 10.0)))
         return run
@@ -347,9 +366,58 @@ class Agent:
         if t in ("speak", "wait"):
             dur = run.get("dur", float(run["p"].get("duration", 1.0)))
             return el >= dur, True, ""
+        if t == "listen":
+            return self._step_listen(run, el)
         if t == "detectObject":
             return self._step_detect(run, el)
         return True, False, f"unknown action {t}"
+
+    def _speak(self, p):
+        """話す (home/speech に出す)。話し終わるまでの秒数を返す。"""
+        text = str(p.get("text", ""))
+        dur = 1.0 + 0.12 * len(text)
+        self.speech = (self.w.time + dur, text)
+        self.last_speak_t = self.w.time
+        x, y, _ = self.w.duck.pose()
+        msg = {"speaker": SERIAL, "text": text, "room": self.w.room_of(x, y), "x": round(x, 2), "y": round(y, 2),
+               "level": "1F", "time": round(self.w.time, 1), "duration": round(dur, 1)}
+        if p.get("intent"):
+            msg["intent"] = p["intent"]
+        self.m.publish("home/speech", msg)
+        return dur
+
+    def _step_listen(self, run, el):
+        """マイクで聞く: 聞こえる声 (同じ部屋か HEAR_RADIUS 以内) を集める。声が聞こえて 1.5 秒続かなければ終わる。
+        直前に話していれば、話し始めてからの声も入れる (話し終わる前に返事が来ることがある)。"""
+        x, y, _ = self.w.duck.pose()
+        room = self.w.room_of(x, y)
+        since = min(run["t0"], getattr(self, "last_speak_t", run["t0"]))
+        for t, v in self.voices:
+            if t < since or any(h["time"] == v.get("time") and h["text"] == v.get("text") for h in run["heard"]):
+                continue
+            near = v.get("room") == room or (v.get("level", "1F") == "1F" and v.get("x") is not None
+                                             and math.hypot(v["x"] - x, v["y"] - y) <= HEAR_RADIUS)
+            if near:
+                run["heard"].append({"who": v.get("who"), "text": v.get("text"), "time": v.get("time")})
+                run["t_last"] = t
+        quiet = run["heard"] and self.w.time - run["t_last"] > 1.5
+        if el >= run["dur"] or quiet:
+            return True, True, json.dumps({"heard": run["heard"]}, ensure_ascii=False)
+        return False, False, ""
+
+    def _save_evidence(self, run, a_id):
+        """見つけたときの頭のカメラの絵を残す (保護者への知らせに添える)。privacy=true なら残さない。"""
+        if run.get("img") is None or str(run["p"].get("privacy", "")).lower() in ("true", "1"):
+            return None
+        import cv2
+        os.makedirs(ALERT_DIR, exist_ok=True)
+        path = os.path.join(ALERT_DIR, f"{a_id}_{self.w.time:.0f}.jpg")
+        b = run["best"].get("box")
+        vis = np.ascontiguousarray(run["img"][..., ::-1])
+        if b:
+            cv2.rectangle(vis, (b[0], b[1]), (b[2], b[3]), (40, 40, 230), 3)
+        cv2.imwrite(path, vis)
+        return os.path.relpath(path, ROOT).replace("\\", "/")
 
     def _step_detect(self, run, el):
         """人を探す: target があればそちらを向き、見えなければ左右に首 (体) を振る。最も確かな検出を返す。"""
@@ -374,10 +442,12 @@ class Agent:
             for b in boxes:
                 est = estimate_person(cam, b, 0.0)
                 if est and (run["best"] is None or est["score"] > run["best"]["score"]):
-                    run["best"] = est
+                    run["best"] = {**est, "box": [int(v) for v in b[:4]]}
+                    run["img"] = img
             if run["best"] and run["best"]["posture"] != "unknown" and ts > 1.0:
                 self.w.set_manual_cmd(0.0, 0.0, 0.0)
-                return True, True, json.dumps({"found": True, **run["best"]}, ensure_ascii=False)
+                return True, True, json.dumps({"found": True, **run["best"], "image": self._save_evidence(run, run["id"])},
+                                              ensure_ascii=False)
         # 部屋を見回す (sweep=full) ときはゆっくり 1 周回る。見つけるまでは止まらない
         if p.get("sweep") == "full":
             if run["best"] is None or run["best"]["posture"] == "unknown":
@@ -395,5 +465,7 @@ class Agent:
         if ts >= run["dur"]:
             self.w.set_manual_cmd(0.0, 0.0, 0.0)
             res = {"found": run["best"] is not None, **(run["best"] or {})}
+            if run["best"]:
+                res["image"] = self._save_evidence(run, run["id"])
             return True, run["best"] is not None, json.dumps(res, ensure_ascii=False)
         return False, False, ""
