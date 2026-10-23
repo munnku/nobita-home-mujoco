@@ -23,7 +23,7 @@ from home.devices import HomeDevices  # noqa: E402
 from home.mqttc import Mqtt  # noqa: E402
 from home.perception import HazardDetector, PersonDetector  # noqa: E402
 from home.scenario import Scenario  # noqa: E402
-from home.vda5050 import Agent  # noqa: E402
+from home.vda5050 import Agent, StretchAgent  # noqa: E402
 from objects import CLASSES as OBJECT_KINDS  # noqa: E402
 from world import DEFAULT_HOUSE, World  # noqa: E402
 
@@ -42,13 +42,18 @@ def main():
         home = yaml.safe_load(f)
     mod = 0.91
     dock = home["robot"]["dock"]
+    with open(os.path.join(a.house, "scenarios", f"{a.scenario}.yaml"), encoding="utf-8") as f:
+        sc = yaml.safe_load(f)
+    st = home["stretch"]["dock"] if sc.get("stretch") else None      # 片付け係の Stretch 3 は使う場面だけ置く (重い)
     w = World(a.house, duck_pose=(dock["x"] * mod, dock["y"] * mod, math.radians(dock["yaw"])),
-              n_persons=len(home["people"]), objects={k: 2 for k in OBJECT_KINDS})
+              n_persons=len(home["people"]), objects={k: 2 for k in OBJECT_KINDS},
+              stretch=(st["x"] * mod, st["y"] * mod, math.radians(st["yaw"])) if st else None)
     det = PersonDetector()
     hazard = HazardDetector.load()
     mq = Mqtt("sim-server", will=("sim/status", "offline"))
     devices = HomeDevices(w, mq, det, a.house)
     agent = Agent(w, mq, det, hazard)
+    st_agent = StretchAgent(w, mq) if w.stretch else None
     scen = Scenario(w, mq, a.house, a.scenario, devices)
     duration = a.duration or scen.duration
     rec = None
@@ -81,6 +86,8 @@ def main():
         scen.tick()
         devices.tick()
         agent.tick()
+        if st_agent:
+            st_agent.tick()
         w.step()
         if rec:
             rec.tick(devices, agent)

@@ -22,7 +22,7 @@ import queue
 
 import numpy as np
 
-from .perception import CameraModel, estimate_object, estimate_person
+from .perception import CameraModel, covered, estimate_object, estimate_person, robot_box
 
 VERSION = "2.0.0"
 MANUFACTURER = "NobitaHome"
@@ -30,6 +30,9 @@ SERIAL = "microduck-01"
 MAP_ID = "nobita-1F"
 HAZARD_NECK = -0.8    # 床の物を探すときの首の角度 (下向き) [rad]
 SAME_OBJECT = 0.2     # 同じ物とみなす距離 [m]
+STUCK_FALLEN = 20.0   # 転んでこれだけ起き上がれなければ「助けが要る」と知らせる [s]
+HAZARD_RANGE = 2.5
+HAZARD_TURN = 0.4     # 床の物を探すときに回る速さ [rad/s] (首を下げて速く回ると位置がずれる)    # 床の物はこれより近い推定だけ使う [m]
 HEAR_RADIUS = 4.0     # アヒルのマイクに声が届く距離 [m] (同じ部屋ならこれより遠くても届く)
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ALERT_DIR = os.path.join(ROOT, "build", "alerts")
@@ -47,7 +50,7 @@ def params(action):
     return {p["key"]: p["value"] for p in action.get("actionParameters", [])}
 
 
-def make_order(order_id, update_id, points, actions_at_last=(), header_id=0):
+def make_order(order_id, update_id, points, actions_at_last=(), header_id=0, serial=SERIAL):
     """司令塔側: [(x, y, theta|None, allowedDeviationXY), ...] から order を作る。最後のノードに actions を付ける。"""
     nodes, edges = [], []
     for k, (x, y, th, dev) in enumerate(points):
@@ -60,7 +63,7 @@ def make_order(order_id, update_id, points, actions_at_last=(), header_id=0):
             edges.append({"edgeId": f"e{k}", "sequenceId": 2 * k - 1, "released": True,
                           "startNodeId": f"n{k-1}", "endNodeId": f"n{k}", "actions": []})
     return {"headerId": header_id, "timestamp": now_iso(), "version": VERSION, "manufacturer": MANUFACTURER,
-            "serialNumber": SERIAL, "orderId": order_id, "orderUpdateId": update_id,
+            "serialNumber": serial, "orderId": order_id, "orderUpdateId": update_id,
             "nodes": nodes, "edges": edges}
 
 
@@ -72,11 +75,12 @@ def action(action_type, action_id, **kw):
 class Agent:
     """ロボット側。シミュレーションのスレッドから tick() を毎回呼ぶ (MQTT の受信はキューで受け渡す)。"""
 
-    def __init__(self, world, mqtt, detector, hazard_detector=None):
+    def __init__(self, world, mqtt, detector, hazard_detector=None, serial=SERIAL):
         self.w = world
         self.m = mqtt
         self.det = detector
         self.hazard = hazard_detector
+        self.serial = serial
         self.inbox = queue.Queue()
         self.header = 0
         self.order = None
@@ -90,11 +94,11 @@ class Agent:
         self.next_state_t = 0.0
         self.last_node = ("", 0)
         self.speech = None          # (話し終わる時刻, 文)
-        self.m.subscribe(topic("order"), lambda t, p: self.inbox.put(("order", p)))
-        self.m.subscribe(topic("instantActions"), lambda t, p: self.inbox.put(("instant", p)))
+        self.m.subscribe(self._topic("order"), lambda t, p: self.inbox.put(("order", p)))
+        self.m.subscribe(self._topic("instantActions"), lambda t, p: self.inbox.put(("instant", p)))
         self.voices = []            # 聞こえた声 (home/voice) [(シミュレーションの時刻, 声)]
         self.m.subscribe("home/voice", lambda t, p: self.inbox.put(("voice", p)) if isinstance(p, dict) else None)
-        self.m.publish(topic("connection"), self._hdr({"connectionState": "ONLINE"}), retain=True, qos=1)
+        self.m.publish(self._topic("connection"), self._hdr({"connectionState": "ONLINE"}), retain=True, qos=1)
         self.publish_factsheet()
 
     def status_text(self):
@@ -115,10 +119,10 @@ class Agent:
     def _hdr(self, body):
         self.header += 1
         return {"headerId": self.header, "timestamp": now_iso(), "version": VERSION,
-                "manufacturer": MANUFACTURER, "serialNumber": SERIAL, **body}
+                "manufacturer": MANUFACTURER, "serialNumber": self.serial, **body}
 
     def publish_factsheet(self):
-        self.m.publish(topic("factsheet"), self._hdr({
+        self.m.publish(self._topic("factsheet"), self._hdr({
             "typeSpecification": {"seriesName": "Microduck", "seriesDescription":
                                   "二足歩行の小型ロボット (Pollen Robotics)。学習済みの方策で歩き、頭のカメラで見る",
                                   "agvKinematic": "DIFF", "agvClass": "CARRIER", "maxLoadMass": 0,
@@ -151,7 +155,7 @@ class Agent:
             "agvGeometry": {}, "loadSpecification": {}}), retain=True)
 
     def publish_state(self):
-        x, y, th = self.w.duck.pose()
+        x, y, th = self._pose()
         o = self.order
         nodes = o["nodes"][self.node_idx:] if o else []
         state = self._hdr({
@@ -165,15 +169,15 @@ class Agent:
                            for e in (o["edges"] if o else []) if e["sequenceId"] > self.last_node[1]],
             "agvPosition": {"x": round(x, 3), "y": round(y, 3), "theta": round(th, 3), "mapId": MAP_ID,
                             "positionInitialized": True, "localizationScore": 1.0},
-            "velocity": {"vx": float(self.w.duck.command[0]), "vy": 0.0, "omega": float(self.w.duck.command[2])},
+            "velocity": dict(zip(("vx", "vy", "omega"), self._vel())),
             "batteryState": {"batteryCharge": 80.0, "charging": False},
             "actionStates": self.action_states[-20:],
-            "errors": self.errors, "information": [],
+            "errors": self.errors, "information": self._information(),
             "safetyState": {"eStop": "NONE", "fieldViolation": False},
             "room": self.w.room_of(x, y),
         })
-        self.m.publish(topic("state"), state)
-        self.m.publish(topic("visualization"), self._hdr({"agvPosition": state["agvPosition"],
+        self.m.publish(self._topic("state"), state)
+        self.m.publish(self._topic("visualization"), self._hdr({"agvPosition": state["agvPosition"],
                                                           "velocity": state["velocity"]}))
 
     # ---- 毎回
@@ -229,7 +233,7 @@ class Agent:
         for n in o["nodes"]:
             for a in n.get("actions", []):
                 self._set_action_state(a, "WAITING")
-        self.w.stop()
+        self._stop()
 
     def _on_instant(self, a):
         t = a["actionType"]
@@ -241,13 +245,13 @@ class Agent:
             self.order = None
             self.node_idx = self.action_idx = 0     # このあとの即時のアクションが新しい order の始めから動くように
             self.action_run = None
-            self.w.stop()
+            self._stop()
             self.w.duck.set_head()
             self.driving = False
             self._set_action_state(a, "FINISHED")
         elif t == "startPause":
             self.paused = True
-            self.w.stop()
+            self._stop()
             self.driving = False
             self._set_action_state(a, "FINISHED")
         elif t == "stopPause":
@@ -269,7 +273,7 @@ class Agent:
             if self.order is None:
                 self.order = {"orderId": f"instant-{a['actionId']}", "orderUpdateId": 0, "nodes": [], "edges": []}
                 self.node_idx = self.action_idx = 0
-            x, y, _ = self.w.duck.pose()
+            x, y, _ = self._pose()
             self.order["nodes"].append({"nodeId": f"here-{a['actionId']}", "sequenceId": 10000 + self.header,
                                         "nodePosition": {"x": x, "y": y, "allowedDeviationXY": 10.0},
                                         "actions": [a]})
@@ -282,35 +286,21 @@ class Agent:
         node = o["nodes"][self.node_idx]
         pos = node.get("nodePosition")
         if not node.get("_reached"):
-            x, y, _ = self.w.duck.pose()
+            x, y, _ = self._pose()
             dev = pos.get("allowedDeviationXY", 0.1) if pos else 0.0
-            if pos is None or math.hypot(pos["x"] - x, pos["y"] - y) <= max(dev, 0.12):
+            if pos is None or (not self._needs_nav(node) and math.hypot(pos["x"] - x, pos["y"] - y) <= max(dev, 0.12)):
                 node["_reached"] = True
+                if o.get("_navigating"):
+                    self._stop()        # 許される距離に入った: 経路の残りを歩き続けないよう止める (止めないと首を下げたまま歩いた)
             elif not o.get("_navigating"):
-                gx, gy, gth, tol = pos["x"], pos["y"], pos.get("theta"), max(dev, 0.12)
-                look = self._look_target(node)
-                if look is not None:
-                    # 人を見に行くときは、人そのものではなく人を見通せる立ち位置へ行き、人の方を向く
-                    r_max = max(1.3, min(dev, 2.0))
-                    vp = self.w.map.viewpoint(look, (x, y), r_min=0.8, r_max=r_max)
-                    if vp is None:      # 見通せる所が無ければ、同じ部屋の行ける所から首を振って探す
-                        room = self.w.room_of(*look)
-                        area = None
-                        if room:
-                            rr = next(r for r in self.w.layout["rooms"] if r["name"] == room)["rect"]
-                            area = [v * self.w.module for v in rr]
-                        vp = self.w.map.viewpoint(look, (x, y), r_min=0.5, r_max=3.0, need_sight=False, area=area)
-                    if vp is not None:
-                        gx, gy, tol = vp[0], vp[1], 0.12
-                        gth = math.atan2(look[1] - vp[1], look[0] - vp[0])
-                ok = self.w.go_to(gx, gy, gth, tolerance=tol)
+                ok = self._start_nav(node, pos, dev, x, y)
                 o["_navigating"] = True
                 self.driving = ok
                 if not ok:
                     self._fail_order(f"no path to node {node['nodeId']}")
                 return
             else:
-                st = self.w.nav_status()
+                st = self._nav_status()
                 if st == "arrived":
                     node["_reached"] = True
                 elif st == "failed":
@@ -324,6 +314,59 @@ class Agent:
             self.action_idx = 0
             self.next_state_t = 0.0
         # ノードのアクション
+        self._node_actions(node)
+
+    def _information(self):
+        d = getattr(self.w, "duck", None)
+        if d is not None and getattr(d, "recovering", False) and not isinstance(self, StretchAgent):
+            stuck = d.time - getattr(d, "fall_time", d.time) > STUCK_FALLEN
+            return [{"infoType": "fallRecovery", "infoLevel": "WARNING" if stuck else "INFO",
+                     "infoDescription": "転んで起き上がれない (助けが要る)" if stuck else "転んだので起き上がっている"}]
+        return []
+
+    # ---- 体ごとに違うところ (アヒル。Stretch は StretchAgent で替える)
+    def _topic(self, name):
+        return topic(name, serial=self.serial)
+
+    def _pose(self):
+        return self.w.duck.pose()
+
+    def _vel(self):
+        c = self.w.duck.command
+        return float(c[0]), 0.0, float(c[2])
+
+    def _stop(self):
+        self.w.stop()
+
+    def _needs_nav(self, node):
+        """近くにいても、ノードの位置へ動き直す必要があるか (Stretch の pick は腕の下に物が来る所へ行く)。"""
+        return False
+
+    def _nav_status(self):
+        return self.w.nav_status()
+
+    def _start_nav(self, node, pos, dev, x, y):
+        """ノードへ向かい始める。経路があれば True。"""
+        gx, gy, gth, tol = pos["x"], pos["y"], pos.get("theta"), max(dev, 0.12)
+        look = self._look_target(node)
+        if look is not None:
+            # 人を見に行くときは、人そのものではなく人を見通せる立ち位置へ行き、人の方を向く
+            r_max = max(1.3, min(dev, 2.0))
+            vp = self.w.map.viewpoint(look, (x, y), r_min=0.8, r_max=r_max)
+            if vp is None:      # 見通せる所が無ければ、同じ部屋の行ける所から首を振って探す
+                room = self.w.room_of(*look)
+                area = None
+                if room:
+                    rr = next(r for r in self.w.layout["rooms"] if r["name"] == room)["rect"]
+                    area = [v * self.w.module for v in rr]
+                vp = self.w.map.viewpoint(look, (x, y), r_min=0.5, r_max=3.0, need_sight=False, area=area)
+            if vp is not None:
+                gx, gy, tol = vp[0], vp[1], 0.12
+                gth = math.atan2(look[1] - vp[1], look[0] - vp[0])
+        return self.w.go_to(gx, gy, gth, tolerance=tol)
+
+    def _node_actions(self, node):
+        o = self.order
         acts = node.get("actions", [])
         if self.action_idx < len(acts):
             a = acts[self.action_idx]
@@ -356,7 +399,7 @@ class Agent:
                 self._set_action_state(a, "FAILED", why)
         self.node_idx = len(self.order["nodes"])
         self.driving = False
-        self.w.stop()
+        self._stop()
 
     # ---- アクション
     def _start_action(self, a):
@@ -392,8 +435,8 @@ class Agent:
         dur = 1.0 + 0.12 * len(text)
         self.speech = (self.w.time + dur, text)
         self.last_speak_t = self.w.time
-        x, y, _ = self.w.duck.pose()
-        msg = {"speaker": SERIAL, "text": text, "room": self.w.room_of(x, y), "x": round(x, 2), "y": round(y, 2),
+        x, y, _ = self._pose()
+        msg = {"speaker": self.serial, "text": text, "room": self.w.room_of(x, y), "x": round(x, 2), "y": round(y, 2),
                "level": "1F", "time": round(self.w.time, 1), "duration": round(dur, 1)}
         if p.get("intent"):
             msg["intent"] = p["intent"]
@@ -442,14 +485,21 @@ class Agent:
         if el < 1.0:
             self.w.set_manual_cmd(0.0, 0.0, 0.0)
             return False, False, ""
-        self.w.set_manual_cmd(0.0, 0.0, 0.55)
+        # 回りながら少しずつずれる (首を下げると前に出やすい) ので、始めの位置へ戻すように前後・左右の指令を足す
+        px, py, th = self._pose()
+        sx, sy = run.setdefault("start", (px, py))
+        ex, ey = sx - px, sy - py
+        bx, by = math.cos(th) * ex + math.sin(th) * ey, -math.sin(th) * ex + math.cos(th) * ey
+        self.w.set_manual_cmd(max(-0.15, min(0.15, 1.5 * bx)), max(-0.15, min(0.15, 1.5 * by)), HAZARD_TURN)
         if self.w.time >= run.get("next_look", 0.0):
             run["next_look"] = self.w.time + 0.5
             img = self.w.render("head_camera", 640, 480)
             cam = CameraModel.from_mujoco(self.w.model, self.w.data, "head_camera", 640, 480)
+            x0, y0, _ = self._pose()
             for b in self.hazard.detect([img])[0]:
                 est = estimate_object(cam, b, 0.0)
-                if est is None:
+                # 遠すぎる (地平線の近くの枠は床に落とすと大きくずれる) か、家の外に落ちた推定は使わない
+                if est is None or math.hypot(est["x"] - x0, est["y"] - y0) > HAZARD_RANGE                         or self.w.room_of(est["x"], est["y"]) is None:
                     continue
                 same = next((o for o in objs if o["kind"] == est["kind"]
                              and math.hypot(o["x"] - est["x"], o["y"] - est["y"]) < SAME_OBJECT), None)
@@ -498,7 +548,11 @@ class Agent:
             img = self.w.render("head_camera", 640, 480)
             boxes = self.det.detect([img])[0]
             cam = CameraModel.from_mujoco(self.w.model, self.w.data, "head_camera", 640, 480)
+            st = getattr(self.w, "stretch", None)
+            rbox = robot_box(cam, st.pose()) if st else None
             for b in boxes:
+                if rbox and covered(b, rbox):
+                    continue        # 片付け係の Stretch を人と間違えない
                 est = estimate_person(cam, b, 0.0)
                 if est and (run["best"] is None or est["score"] > run["best"]["score"]):
                     run["best"] = {**est, "box": [int(v) for v in b[:4]]}
@@ -528,3 +582,108 @@ class Agent:
                 res["image"] = self._save_evidence(run, run["id"])
             return True, run["best"] is not None, json.dumps(res, ensure_ascii=False)
         return False, False, ""
+
+
+# ---- 2 台目: Stretch 3 (片付け係)
+STRETCH_SERIAL = "stretch-01"
+OBJECT_WIDTH = {"button_battery": 0.020, "coin": 0.0235, "marble": 0.017, "toy_block": 0.032, "scissors": 0.05}
+
+
+class StretchAgent(Agent):
+    """Stretch 3 のロボット側。order のノードへ台車で行き、アクション pick (床の物を拾う)・drop (片付けの箱に入れる)。
+
+    pick / drop のノードでは、ノードの位置 (物・箱) が腕の下に来る台車の位置と向きを選んで行く (World.stretch_pick_pose)。
+    拾う動きは sim/stretch.py の pick_step / drop_step (計算で決めた動き)。物の位置は見つけたアヒルの推定 (x, y)。
+    """
+
+    def __init__(self, world, mqtt, serial=STRETCH_SERIAL):
+        super().__init__(world, mqtt, detector=None, serial=serial)
+
+    def status_text(self):
+        if self.driving:
+            return "移動中"
+        if self.action_run is not None:
+            return {"pick": "拾っている", "drop": "箱に入れている"}.get(self.action_run.get("type"), "作業中")
+        return "待機"
+
+    def publish_factsheet(self):
+        self.m.publish(self._topic("factsheet"), self._hdr({
+            "typeSpecification": {"seriesName": "Stretch 3", "seriesDescription":
+                                  "台車と上下・伸縮する腕を持つ家庭用のロボット (Hello Robot)。床の小さい物を拾って片付ける",
+                                  "agvKinematic": "DIFF", "agvClass": "CARRIER", "maxLoadMass": 0.5,
+                                  "localizationTypes": ["NATURAL"], "navigationTypes": ["AUTONOMOUS"]},
+            "physicalParameters": {"speedMin": 0.0, "speedMax": 0.25, "accelerationMax": 0.5,
+                                   "decelerationMax": 0.5, "heightMin": 1.4, "heightMax": 1.4,
+                                   "width": 0.34, "length": 0.33},
+            "protocolLimits": {}, "protocolFeatures": {"optionalParameters": [], "agvActions": [
+                {"actionType": "pick", "actionScopes": ["NODE"], "actionDescription": "床の小さい物を拾う",
+                 "actionParameters": [{"key": "x", "valueDataType": "FLOAT"}, {"key": "y", "valueDataType": "FLOAT"},
+                                      {"key": "objectType", "valueDataType": "STRING", "isOptional": True}],
+                 "resultDescription": "JSON: held"},
+                {"actionType": "drop", "actionScopes": ["NODE"], "actionDescription": "持っている物を片付けの箱に入れる",
+                 "actionParameters": [], "resultDescription": "JSON: dropped"},
+                {"actionType": "cancelOrder", "actionScopes": ["INSTANT"]},
+                {"actionType": "stateRequest", "actionScopes": ["INSTANT"]},
+                {"actionType": "factsheetRequest", "actionScopes": ["INSTANT"]}]},
+            "agvGeometry": {}, "loadSpecification": {}}), retain=True)
+
+    # ---- 体
+    def _pose(self):
+        return self.w.stretch.pose()
+
+    def _vel(self):
+        v, w = self.w.stretch._vw
+        return float(v), 0.0, float(w)
+
+    def _stop(self):
+        self.w.stretch_stop()
+        self.w.stretch.stop()
+
+    def _work_target(self, node):
+        for a in node.get("actions", []):
+            p = params(a)
+            if a["actionType"] == "pick":
+                return float(p["x"]), float(p["y"])
+            if a["actionType"] == "drop":
+                return self.w.tidy_box_xyz()[:2]
+        return None
+
+    def _needs_nav(self, node):
+        return self._work_target(node) is not None
+
+    def _start_nav(self, node, pos, dev, x, y):
+        target = self._work_target(node)
+        if target is not None:
+            pp = self.w.stretch_pick_pose(target)
+            if pp is None:
+                return False
+            return self.w.stretch_go_to(*pp)
+        return self.w.stretch_go_to(pos["x"], pos["y"], pos.get("theta"), tolerance=max(dev, 0.1))
+
+    def _nav_status(self):
+        return self.w.stretch_nav_status()
+
+    # ---- アクション
+    def _start_action(self, a):
+        run = {"t0": self.w.time, "p": params(a), "type": a["actionType"], "id": a["actionId"]}
+        if run["type"] in ("pick", "drop"):
+            self.w.stretch.reset_task()
+        return run
+
+    def _step_action(self, a, run):
+        t, p, st = run["type"], run["p"], self.w.stretch
+        if t == "pick":
+            r = st.pick_step((float(p["x"]), float(p["y"]), 0.0), yaw=float(p.get("yaw", 0.0)),
+                             width=OBJECT_WIDTH.get(p.get("objectType"), 0.025))
+        elif t == "drop":
+            bx, by, bz = self.w.tidy_box_xyz()
+            r = st.drop_step((bx, by, bz + 0.12))
+        elif t == "wait":
+            return self.w.time - run["t0"] >= float(p.get("duration", 1.0)), True, ""
+        else:
+            return True, False, f"unknown action {t}"
+        if r == "running":
+            return False, False, ""
+        if r == "done":
+            return True, True, json.dumps({"held": t == "pick", "dropped": t == "drop"}, ensure_ascii=False)
+        return True, False, json.dumps({"error": st.reason}, ensure_ascii=False)

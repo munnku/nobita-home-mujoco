@@ -1,6 +1,9 @@
 # のび太君の家の暮らしの設定 (x y はマス 0.91 m、yaw は度、z の代わりに level)
 robot:
   dock: {x: 8.0, y: 3.4, yaw: -90}      # アヒルの待機場所 (居間の入口の内側、テレビの横)
+stretch:
+  dock: {x: 0.55, y: 4.6, yaw: 0}       # 片付け係 Stretch 3 の待機場所 (DK の流し台と冷蔵庫の間)
+  box: [1.15, 5.5]                      # 片付けの箱 (冷蔵庫の東。sim/world.py の TIDY_BOX と同じ)
 people:
   - {name: tamako, label: ママ (玉子)}
   - {name: nobita, label: のび太}
@@ -73,8 +76,9 @@ blind_rooms:
   yokushitsu: {door: yokushitsu, stand: [6.5, 6.5], inside: [5.3, 6.45], max_stay: 40}
 # 見回り (床の小さい危ない物を探す)。points: 見る所 (マス)。every: おるすばん中にこの秒数ごとに見回る
 # sweep: 1 か所で回りながら見る秒数。at_start: おるすばんになったらすぐ見回る (home/patrol/request でも始まる)
+# 見る所は家具から 0.6 m 以上離す (首を下げてその場で回ると 0.3〜0.5 m ずれ、近いと家具にぶつかって転んだ)
 patrol:
   every: 600
-  sweep: 11.0
+  sweep: 16.0
   at_start: false
-  points: [[5.3, 1.0], [7.9, 3.3], [9.3, 5.0], [6.0, 5.5], [3.3, 4.7], [1.3, 1.8], [10.6, 3.3]]
+  points: [[5.9, 1.0], [7.8, 0.9], [8.0, 4.8], [10.6, 3.3], [2.9, 5.0], [1.6, 1.7]]

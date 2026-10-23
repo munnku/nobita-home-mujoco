@@ -187,3 +187,22 @@ def estimate_object(cam, box, floor_z=0.0):
     if p is None:
         return None
     return {"kind": kind, "x": round(float(p[0]), 2), "y": round(float(p[1]), 2), "score": round(score, 2)}
+
+
+# ---- 家にいるほかのロボット (片付け係の Stretch) を人と間違えない
+def robot_box(cam, pose, half=0.22, height=1.45):
+    """位置 pose (x, y, yaw) のロボット (台車 2*half 角 × 高さ height) が絵に写る範囲 (x1, y1, x2, y2)。写らなければ None。"""
+    x, y = pose[0], pose[1]
+    pts = [cam.project((x + dx, y + dy, z)) for dx in (-half, half) for dy in (-half, half) for z in (0.0, height)]
+    if any(p is None for p in pts):
+        return None
+    us, vs = [p[0] for p in pts], [p[1] for p in pts]
+    return min(us), min(vs), max(us), max(vs)
+
+
+def covered(box, region, frac=0.6):
+    """枠 box の面積の frac 以上が region の中にあるか。"""
+    x1, y1, x2, y2 = max(box[0], region[0]), max(box[1], region[1]), min(box[2], region[2]), min(box[3], region[3])
+    inter = max(0.0, x2 - x1) * max(0.0, y2 - y1)
+    area = max(1e-6, (box[2] - box[0]) * (box[3] - box[1]))
+    return inter / area >= frac

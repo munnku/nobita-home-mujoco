@@ -5,6 +5,8 @@
                + 前回の行動 (14) + 指令 (13: 速度 vx, vy, wz / 頭の姿勢 4 / 胴体の姿勢 6)
   行動 14 次元 → 関節の目標角 = 既定姿勢 + 行動。50 Hz (物理 5 ms × 4)
 サーボは BAM (Rhoban/bam) の XL330 モデルで動かす (方策の学習と同じ)。
+転んだら (胴体の高さが FALLEN_Z より低い) 起き上がりの方策 (公開の velstand。転んでも起き上がるように学習されている) に
+切り替え、UPRIGHT_HOLD 秒しっかり立てたら歩きの方策に戻す。
 """
 import math
 import os
@@ -19,6 +21,11 @@ POLICY_DIR = os.environ.get("MICRODUCK_POLICIES", os.path.join(ROOT, "third_part
 DUCK_XML = os.path.join(RL, "src", "mjlab_microduck", "robot", "microduck",
                         "robot_groundcontact_backlash.xml")
 
+FALLEN_Z = 0.07       # 胴体の高さがこれより低ければ転んでいる [m]
+UPRIGHT_Z = 0.105     # 起き上がった: 胴体の高さがこれより高く
+UPRIGHT_TILT = 0.25   # 傾きがこれより小さい [rad] 状態が
+UPRIGHT_HOLD = 1.0    # これだけ続いたら歩きの方策に戻す [s]
+RECOVERY_POLICY = "velstand"
 TIMESTEP = 0.005
 DECIMATION = 4
 # 既定姿勢 (infer_policy.py の DEFAULT_POSE = STAND2)。関節の順はアクチュエータの順
@@ -44,13 +51,17 @@ def load_bam_model(vin=BAM_VIN):
     return m
 
 
+OTHER_ROBOT = "st_"     # 同じ家にいるほかのロボット (Stretch) のアクチュエータの名前の頭。アヒルのものとして扱わない
+
+
 def apply_bam(spec, bam_model):
-    """位置制御のアクチュエータを BAM が書くトルクのモーターに替える (infer_policy.load_mujoco_with_bam と同じ)。"""
+    """位置制御のアクチュエータを BAM が書くトルクのモーターに替える (infer_policy.load_mujoco_with_bam と同じ)。
+    ほかのロボット (名前が OTHER_ROBOT で始まる) のアクチュエータには触らない。"""
     force_limit = bam_model.actuator.vin * bam_model.kt.value / bam_model.R.value
     joints = {j.name: j for j in spec.joints}
     names = []
     for act in spec.actuators:
-        if act.target.startswith("passive_"):
+        if act.target.startswith("passive_") or act.name.startswith(OTHER_ROBOT):
             continue
         act.set_to_motor()
         act.forcelimited = True
@@ -76,7 +87,7 @@ def _rotate_inverse(q, v):
 class Duck:
     """家のシーン (MjSpec、アヒルをつないだもの) から作る。model と data を持ち、step() で 0.02 s 進める。"""
 
-    def __init__(self, spec, policy="velstand"):
+    def __init__(self, spec, policy="velstand", recovery=RECOVERY_POLICY):
         from bam.mujoco import MujocoController
         bam_model = load_bam_model()
         names = apply_bam(spec, bam_model)
@@ -89,15 +100,23 @@ class Duck:
         self.session = ort.InferenceSession(path, providers=["CPUExecutionProvider"])
         self.in_name = self.session.get_inputs()[0].name
         self.out_name = self.session.get_outputs()[0].name
+        # 起き上がりの方策 (歩きの方策が velstand 自身なら同じものを使う)
+        rpath = os.path.join(POLICY_DIR, recovery + ".onnx") if recovery else None
+        self.recovery = (ort.InferenceSession(rpath, providers=["CPUExecutionProvider"])
+                         if rpath and os.path.exists(rpath) and os.path.abspath(rpath) != os.path.abspath(path) else None)
+        self.recovering = False
+        self.falls = 0
+        self._upright_since = None
         m = self.model
-        self.qpos_idx = [int(m.jnt_qposadr[m.actuator_trnid[i, 0]]) for i in range(m.nu)]
-        self.qvel_idx = [int(m.jnt_dofadr[m.actuator_trnid[i, 0]]) for i in range(m.nu)]
+        acts = [i for i in range(m.nu) if not m.actuator(i).name.startswith(OTHER_ROBOT)]   # アヒルの 14 個
+        self.qpos_idx = [int(m.jnt_qposadr[m.actuator_trnid[i, 0]]) for i in acts]
+        self.qvel_idx = [int(m.jnt_dofadr[m.actuator_trnid[i, 0]]) for i in acts]
         fj = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_JOINT, "trunk_base_freejoint")
         self.qa = int(m.jnt_qposadr[fj])
         self.trunk = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_BODY, "trunk_base")
         gyro = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_SENSOR, "imu_ang_vel")
         self.gyro_adr = int(m.sensor_adr[gyro])
-        self.last_action = np.zeros(m.nu, np.float32)
+        self.last_action = np.zeros(len(acts), np.float32)
         self.command = np.zeros(13, np.float32)
         self.time = 0.0
 
@@ -132,8 +151,30 @@ class Duck:
             self.command,
         ]).astype(np.float32)
 
+    def _check_fall(self):
+        z = float(self.data.qpos[self.qa + 2])
+        if not self.recovering:
+            if z < FALLEN_Z and self.recovery is not None:
+                self.recovering, self._upright_since = True, None
+                self.falls += 1
+                self.fall_time = self.time
+            return
+        g = _rotate_inverse(self.data.xquat[self.trunk], np.array([0.0, 0.0, -1.0]))
+        tilt = math.acos(max(-1.0, min(1.0, -float(g[2]))))
+        if z > UPRIGHT_Z and tilt < UPRIGHT_TILT:
+            self._upright_since = self._upright_since if self._upright_since is not None else self.time
+            if self.time - self._upright_since >= UPRIGHT_HOLD:
+                self.recovering = False
+        else:
+            self._upright_since = None
+
     def step(self):
-        action = self.session.run([self.out_name], {self.in_name: self.observe()[None]})[0][0]
+        self._check_fall()
+        session = self.recovery if self.recovering else self.session
+        obs = self.observe()
+        if self.recovering:
+            obs[-13:] = 0.0              # 起き上がる間は止まれの指令 (velstand は指令 0 で立つ)
+        action = session.run([session.get_outputs()[0].name], {session.get_inputs()[0].name: obs[None]})[0][0]
         self.last_action = action.astype(np.float32)
         self.bam.q_target[:] = DEFAULT_POSE + self.last_action
         for _ in range(DECIMATION):

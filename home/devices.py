@@ -6,6 +6,7 @@
 - スマートロック: 玄関と勝手口。locked を /set で切り替える。扉の開閉センサー (open) も出す
 - 見守りカメラのマイク: 同じ部屋の人の声 (home/voice) を audio/heard に出す (声は文字で表す)
 - 扉の開閉センサー: 鍵の無い扉 (脱衣所・トイレなど) が開いているか (contact/open)
+- 片付け係の Stretch は背が高く人に見えることがあるので、位置 (VDA 5050 の state) から絵に投影した範囲の検出は人にしない
 MQTT からの書き込みは受信スレッドで来るので、キューにためてシミュレーションのスレッドで反映する。
 """
 import os
@@ -14,7 +15,7 @@ import queue
 import yaml
 
 from .homie import HomieDevice
-from .perception import CameraModel, estimate_person
+from .perception import CameraModel, covered, estimate_person, robot_box
 
 
 def _dev_id(prefix, name):
@@ -161,7 +162,11 @@ class HomeDevices:
             cam = CameraModel.from_mujoco(self.w.model, self.w.data, c["name"], cfg["width"], cfg["height"])
             floor_z = self.w.layout["levels"][self.rooms[c["room"]]["level"]]["z"]
             persons = []
+            st = getattr(self.w, "stretch", None)
+            rbox = robot_box(cam, st.pose()) if st else None
             for b in bxs:
+                if rbox and covered(b, rbox):
+                    continue        # 片付け係の Stretch (背が高く人に見える)。位置は分かっているので人として扱わない
                 p = estimate_person(cam, b, floor_z)
                 if p:
                     # 足元が床の高さの違う部屋 (玄関の土間) に落ちたら、その床の高さで計算し直す

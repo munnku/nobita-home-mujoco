@@ -54,9 +54,11 @@ def _zrange(model, data, g):
 
 
 class FloorMap:
-    def __init__(self, model, data, rooms, module, ignore_bodies=()):
-        """rooms: layout.yaml の rooms (1 階のものだけ使う)。ignore_bodies: アヒルなど地図に入れない body の id。"""
+    def __init__(self, model, data, rooms, module, ignore_bodies=(), radius=ROBOT_RADIUS):
+        """rooms: layout.yaml の rooms (1 階のものだけ使う)。ignore_bodies: アヒルなど地図に入れない body の id。
+        radius: ロボットの半径 + 余裕 [m] (Stretch のような大きいロボットは大きくする)。"""
         self.model, self.data = model, data
+        self.radius = radius
         self.rooms = [r for r in rooms if r["level"] == "1F"]
         self.module = module
         self.ignore = set(ignore_bodies)
@@ -133,7 +135,7 @@ class FloorMap:
         self.obstacle = obst | ~floor
         # 障害物からの距離 (セル) を求めて、膨らませと費用に使う
         self.dist = self._distance(self.obstacle) * RES
-        self.free = self.dist > ROBOT_RADIUS
+        self.free = self.dist > self.radius
 
     @staticmethod
     def _distance(obst):
@@ -165,7 +167,7 @@ class FloorMap:
     # ---- 経路
     def plan(self, start, goal):
         """start, goal: (x, y) [m]。通れる経路の点列 [m] (間引いたもの) か None を返す。"""
-        s = self.nearest_free(*start, max_r=0.5)
+        s = self.nearest_free(*start, max_r=1.0)      # ロボットが家具の近くにずれていても出られるように
         g = self.nearest_free(*goal)
         if s is None or g is None:
             return None
@@ -208,7 +210,8 @@ class FloorMap:
         cells.reverse()
         return [self.to_xy(*c) for c in self._shortcut(cells)]
 
-    def _line_free(self, a, b, margin=ROBOT_RADIUS + 0.02):
+    def _line_free(self, a, b, margin=None):
+        margin = self.radius + 0.02 if margin is None else margin
         n = int(max(abs(b[0] - a[0]), abs(b[1] - a[1]))) + 1
         for k in range(n + 1):
             i = round(a[0] + (b[0] - a[0]) * k / n)

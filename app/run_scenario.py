@@ -45,8 +45,11 @@ def main():
     m = Mqtt("run-scenario")
     for pat in ("home/alerts", "home/log", "home/speech", "home/voice", "sim/scenario"):
         m.subscribe(pat, lambda t, p: events.append({"topic": t, "payload": p}))
-    truth = {}
-    m.subscribe("sim/truth", lambda t, p: truth.update(p))
+    truth, track = {}, []
+    def on_truth(t, p):
+        truth.update(p)
+        track.append({"time": p.get("time"), "robot": p.get("robot"), "fallen": p.get("fallen")})
+    m.subscribe("sim/truth", on_truth)
     status = {}
     m.subscribe("sim/status", lambda t, p: status.update(s=p))
     m.publish("sim/status", "starting", retain=True)
@@ -70,7 +73,7 @@ def main():
     stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     path = os.path.join(out_dir, f"{a.scenario}_{stamp}.json")
     with open(path, "w", encoding="utf-8") as f:
-        json.dump({"scenario": a.scenario, "events": events, "final_truth": truth}, f, ensure_ascii=False, indent=1)
+        json.dump({"scenario": a.scenario, "events": events, "final_truth": truth, "robot_track": track}, f, ensure_ascii=False, indent=1)
     print("==== 結果 ====")
     for e in events:
         p = e["payload"]

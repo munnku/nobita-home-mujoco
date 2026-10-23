@@ -70,7 +70,7 @@ class Coordinator:
         s("homie/+/contact/open", lambda t, p: self.door_open.__setitem__(t.split("/")[1][5:], str(p).lower() == "true"))
         s("homie/+/sensor/motion", lambda t, p: self.motion.__setitem__(t.split("/")[1][7:], str(p).lower() == "true"))
         s("homie/+/light/on", lambda t, p: self.light_on.__setitem__(t.split("/")[1][6:], str(p).lower() == "true"))
-        s(topic("state"), lambda t, p: self.robot.update(p))
+        s(topic("state"), self._on_robot_state)
         # 決まりごと (この順に毎回見る)
         self.rules = [Requests(self), Fall(self), Predict(self), BlindSpot(self), Patrol(self), HideSeek(self), WakeUp(self), Entrance(self), Lights(self)]
 
@@ -124,6 +124,18 @@ class Coordinator:
                 action("cancelOrder", f"cancel-{self.n}")]}, qos=1)
             self.log(f"アヒルの仕事を取り消した: {name}")
             self.job = None
+
+    def _on_robot_state(self, t, p):
+        self.robot.update(p)
+        info = [i for i in p.get("information", []) if i.get("infoType") == "fallRecovery"]
+        if info and info[0].get("infoLevel") == "WARNING" and not getattr(self, "_robot_down", False):
+            self._robot_down = True
+            self.log("アヒルが転んで起き上がれない → 保護者に知らせる", kind="robot_down")
+            self.m.publish("home/alerts", {"type": "robot_down", "level": "warn", "time": round(self.time, 1),
+                                           "summary": "見守りロボットが転んで起き上がれません。帰ったら起こしてください。"}, qos=1)
+        elif not info and getattr(self, "_robot_down", False):
+            self._robot_down = False
+            self.log("アヒルが起き上がった", kind="robot_up")
 
     def _on_persons(self, t, persons):
         room = self.cam_room.get(t.split("/")[1], "?")

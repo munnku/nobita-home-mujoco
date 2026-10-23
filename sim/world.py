@@ -7,6 +7,9 @@ IoT 機器やロボットの制御はこのクラスを通して世界を読み�
 - set_light: 部屋の照明
 - render(camera): カメラの絵 (RGB)
 - objects: 床に落ちている小さい物 (sim/objects.py)。objects={種類: 個数} で用意し、self.objects で置く・片付ける
+- stretch: 片付け係の Stretch 3 (sim/stretch.py)。stretch=(x, y, yaw) で置く。台車は自分の地図 (大きさに合わせて
+  広げたもの) の A* と pure pursuit で動く (stretch_go_to)。拾ったものを入れる箱 (tidy_box) も置く。
+  2 台のロボットは互いを地図に入れない (動いているロボットどうしはよけない)
 """
 import math
 import os
@@ -19,6 +22,7 @@ from floormap import FloorMap
 from house import load as load_layout
 from navigator import Navigator
 from objects import Objects, add_objects
+from stretch import BASE_RADIUS, Stretch, add_stretch
 from scene import compose, person_pose
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -29,11 +33,14 @@ LIGHT_ON = np.array([0.45, 0.44, 0.40])
 POLICY_SPEED = {"velstand": (0.3, 0.0), "alpha_walking": (0.3, 0.0), "nobita_walk": (0.4, 0.32),
                 "nobita_walk2": (0.4, 0.3)}
 MAX_RETRIES = 3       # 進まなくなったときに経路を作り直す回数
+STRETCH_RADIUS = BASE_RADIUS + 0.07     # Stretch の地図で壁・家具から離す距離 [m]
+STRETCH_SPEED = 0.25                    # Stretch の前進の上限 [m/s]
+TIDY_BOX = (1.15, 5.5, 0.30, 0.25, 0.12)  # 片付けの箱 (x, y [マス]、幅・奥行き・高さ [m])。DK の冷蔵庫の東
 
 
 class World:
     def __init__(self, house_dir=DEFAULT_HOUSE, duck_pose=(0.0, 0.0, 0.0), n_persons=2,
-                 policy=None, objects=None):
+                 policy=None, objects=None, stretch=None):
         # 既定は、この家で強化学習した歩き方 (models/nobita_walk.onnx) があればそれ、なければ公開の velstand
         default = "nobita_walk" if os.path.exists(os.path.join(ROOT, "models", "nobita_walk.onnx")) else "velstand"
         policy = policy or os.environ.get("DUCK_POLICY", default)
@@ -43,9 +50,19 @@ class World:
         self.module = self.layout["module"]
         spec, self.door_open_q = compose(house_dir, duck=True, n_persons=n_persons)
         obj_names = add_objects(spec, objects) if objects else []
+        if stretch:
+            add_stretch(spec, "st_", (stretch[0], stretch[1], 0.0), stretch[2], weld_objects=obj_names)
+            self._add_tidy_box(spec, self.module)
         self.duck = Duck(spec, policy=policy)
         self.model, self.data = self.duck.model, self.duck.data
         self.objects = Objects(self.model, self.data, obj_names) if obj_names else None
+        self.stretch = None
+        if stretch:
+            # 数 g の物を指で挟むには滑りの補正 (noslip) が要る (docs/learning/pick_notes.md。アヒルの歩き方は変わらない)
+            self.model.opt.noslip_iterations = 3
+            self.stretch = Stretch(self.model, self.data, "st_",
+                                   weld_assist=os.environ.get("STRETCH_WELD_ASSIST", "1") == "1")
+            self.stretch.reset(*stretch)
         m = self.model
         self.n_persons = n_persons
         self.person_state = {}
@@ -55,7 +72,14 @@ class World:
         self.duck.reset(*duck_pose)
         duck_root = m.body_rootid[self.duck.trunk]
         ignore = [b for b in range(m.nbody) if m.body_rootid[b] == duck_root]
+        if self.stretch:
+            ignore += list(self.stretch.bodies)
         self.map = FloorMap(m, self.data, self.layout["rooms"], self.module, ignore_bodies=ignore)
+        if self.stretch:
+            self.st_map = FloorMap(m, self.data, self.layout["rooms"], self.module, ignore_bodies=ignore,
+                                   radius=STRETCH_RADIUS)
+            self.st_nav = Navigator(STRETCH_SPEED, 0.0)
+            self.st_driving = False
         key = os.path.splitext(os.path.basename(policy))[0]
         self.nav = Navigator(*POLICY_SPEED.get(key, (0.3, 0.0)))
         self.policy_name = key
@@ -77,6 +101,14 @@ class World:
                 self.retries += 1
                 if not self._plan(*self.goal):
                     self.goal = None
+        if self.stretch:
+            if not self.st_nav.done:
+                self.stretch.drive(*self.st_nav.update(*self.stretch.pose()))
+                self.st_driving = True
+            elif self.st_driving:
+                self.stretch.drive(0.0, 0.0)
+                self.st_driving = False
+            self.stretch.update()
         self.duck.step()
         self.time += 0.02
 
@@ -114,6 +146,53 @@ class World:
         if self.nav.stuck:
             return "failed" if self.retries >= MAX_RETRIES else "moving"
         return "idle"
+
+    # ---- Stretch (片付け係)
+    @staticmethod
+    def _add_tidy_box(spec, mod):
+        x, y, w, d, h = TIDY_BOX
+        b = spec.worldbody.add_body(name="tidy_box", pos=[x * mod, y * mod, 0.0])
+        t = 0.01
+        for name, pos, size in (("floor", [0, 0, t / 2], [w / 2, d / 2, t / 2]),
+                                ("n", [0, d / 2, h / 2], [w / 2, t / 2, h / 2]), ("s", [0, -d / 2, h / 2], [w / 2, t / 2, h / 2]),
+                                ("e", [w / 2, 0, h / 2], [t / 2, d / 2, h / 2]), ("w", [-w / 2, 0, h / 2], [t / 2, d / 2, h / 2])):
+            b.add_geom(name=f"tidy_box_{name}", type=mujoco.mjtGeom.mjGEOM_BOX, pos=pos, size=size,
+                       rgba=[0.25, 0.45, 0.75, 1], group=1)
+
+    def tidy_box_xyz(self):
+        x, y, *_ = TIDY_BOX
+        return (x * self.module, y * self.module, 0.0)
+
+    def stretch_go_to(self, x, y, yaw=None, tolerance=0.08):
+        """Stretch の台車を (x, y) へ (着いたら yaw を向く)。経路がなければ False。"""
+        px, py, _ = self.stretch.pose()
+        path = self.st_map.plan((px, py), (x, y))
+        if path is None:
+            return False
+        self.st_nav.set_path(path, goal_yaw=yaw, target=(x, y), tolerance=tolerance)
+        return True
+
+    def stretch_stop(self):
+        self.st_nav.stop()
+
+    def stretch_nav_status(self):
+        n = self.st_nav
+        return "moving" if not n.done else ("arrived" if n.arrived else ("failed" if n.stuck else "idle"))
+
+    def stretch_pick_pose(self, target):
+        """target (x, y) を拾うための台車の (x, y, yaw)。腕の下に来て、台車が地図の通れる所に収まる向きを選ぶ。"""
+        best = None
+        sx, sy, _ = self.stretch.pose()
+        for k in range(16):
+            yaw = -math.pi + k * math.pi / 8
+            x, y, yaw = self.stretch.arm_side_point(target, yaw)
+            c = self.st_map.to_cell(x, y)
+            if not (0 <= c[0] < self.st_map.w and 0 <= c[1] < self.st_map.h) or not self.st_map.free[c]:
+                continue
+            cost = math.hypot(x - sx, y - sy)
+            if best is None or cost < best[0]:
+                best = (cost, (x, y, yaw))
+        return best[1] if best else None
 
     # ---- 扉
     def _joint_adr(self, name):
