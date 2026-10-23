@@ -19,6 +19,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 import threading
 
 LEVELS = ("info", "warn", "emergency")
@@ -233,8 +234,11 @@ def _claude_code(prompt, timeout, parse=_parse):
     exe = shutil.which("claude") or shutil.which("claude.cmd")
     if not exe:
         raise RuntimeError("claude (Claude Code) が見つからない")
-    r = subprocess.run([exe, "-p", prompt, "--output-format", "json"], capture_output=True, text=True,
-                       encoding="utf-8", timeout=timeout)
+    # 問いは標準入力で渡す (Windows の claude.CMD は改行を含む引数をうまく渡せない)。
+    # リポジトリの外 (一時フォルダ) で、MCP サーバーを読み込まずに呼ぶ (このリポジトリの .mcp.json を毎回起動して遅くなるため)
+    r = subprocess.run([exe, "-p", "--output-format", "json", "--strict-mcp-config", "--max-turns", "1"],
+                       input=prompt, capture_output=True, text=True, encoding="utf-8", timeout=timeout,
+                       cwd=tempfile.gettempdir())
     try:
         out = json.loads(r.stdout)
     except ValueError:
