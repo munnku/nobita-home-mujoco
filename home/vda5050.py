@@ -36,7 +36,8 @@ EDGE = 4              # 絵の縁からこれだけ [px] の所にかかる枠�
 HAZARD_RANGE = 2.5    # 床の物はこれより近い推定だけ使う [m]
 HAZARD_TURN = 0.8     # 床の物を探すときに回る指令 [rad/s]。歩きの方策は 0.65 より小さい回転の指令ではほとんど回らない
                       # (実際は約 0.5 rad/s。首を下げて速く回ると位置がずれるので、ずれは前後・左右の指令で戻す)
-MIN_TURN = 0.7        # 歩きの方策が回り始める回転の指令の下限 [rad/s] (これより小さいと止まれとして扱われる)
+HAZARD_SETTLE = 1.5   # 見る所に着いてから、首を上げたまま止まって落ち着く時間 [s]
+MIN_TURN = 0.7       # 歩きの方策が回り始める回転の指令の下限 [rad/s] (これより小さいと止まれとして扱われる)
 HAZARD_REPORT = 0.55  # 1 周のうちの一番高い score がこれより低いか、1 回しか見えなかった物は知らせない (壁際・足元の見間違い)
 HEAR_RADIUS = 4.0     # アヒルのマイクに声が届く距離 [m] (同じ部屋ならこれより遠くても届く)
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -493,8 +494,14 @@ class Agent:
         if self.hazard is None:
             return True, False, json.dumps({"found": False, "objects": [], "error": "no hazard detector"})
         objs = run.setdefault("objects", [])
+        # 歩いてきた勢いのまま止まって首を下げると前に転ぶ (見る所に着いた直後に転んでいた)。
+        # まず首を上げたまま止まって落ち着き (HAZARD_SETTLE 秒)、止まったまま首を下げてから回る
+        if el < HAZARD_SETTLE:
+            self.w.duck.set_head()
+            self.w.set_manual_cmd(0.0, 0.0, 0.0)
+            return False, False, ""
         self.w.duck.set_head(neck_pitch=HAZARD_NECK)
-        if el < 1.0:
+        if el < HAZARD_SETTLE + 1.0:
             self.w.set_manual_cmd(0.0, 0.0, 0.0)
             return False, False, ""
         # 回りながら少しずつずれる (首を下げると前に出やすい) ので、始めの位置へ戻すように前後・左右の指令を足す

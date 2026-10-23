@@ -88,3 +88,13 @@ class Objects:
 
     def on_floor(self):
         return {n: tuple(self.pos(n)[:2]) for n, s in self.state.items() if s is not None}
+
+    def unstick(self, name, floor_z=0.0):
+        """床にめり込んだ物を床の上に戻す (向きと x, y はそのまま、速さは 0)。
+        軽い物 (硬貨 4.5 g) は車輪や足に踏まれると床の中に押し込まれ、接触が振動し続けて出てこない (MuJoCo の現象)。"""
+        kind = self.kind(name)
+        shape, size = KINDS[kind][1], KINDS[kind][2]
+        h = size[0] if shape == "sphere" else (size[1] if shape == "cylinder" else size[2])
+        q = self.qadr[name]
+        self.d.qpos[q + 2] = floor_z + h + 0.0005
+        self.d.qvel[self.vadr[name]:self.vadr[name] + 6] = 0

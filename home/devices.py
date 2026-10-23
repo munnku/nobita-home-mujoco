@@ -9,6 +9,7 @@
 - 片付け係の Stretch は背が高く人に見えることがあるので、位置 (VDA 5050 の state) から絵に投影した範囲の検出は人にしない
 MQTT からの書き込みは受信スレッドで来るので、キューにためてシミュレーションのスレッドで反映する。
 """
+import math
 import os
 import queue
 
@@ -16,6 +17,9 @@ import yaml
 
 from .homie import HomieDevice
 from .perception import CameraModel, covered, estimate_person, robot_box
+
+DUCK_NEAR = 0.6       # 見守りカメラの「横になった人」がアヒルからこれより近ければ、アヒル自身とみなす [m]
+STRETCH_NEAR = 0.9    # 同じく Stretch から (腕を伸ばすと台車の中心から 0.7 m ほど出る) [m]
 
 
 def _dev_id(prefix, name):
@@ -173,6 +177,11 @@ class HomeDevices:
                 if any(covered(b, r) for r in rboxes):
                     continue
                 p = estimate_person(cam, b, floor_z)
+                # 横になった人に見えたのがロボットのすぐそば: ロボット自身 (アヒルは上から見ると横になった人に似る。
+                # Stretch は横に伸ばした腕が台車の範囲の外に出る)
+                near = [(self.w.duck.pose(), DUCK_NEAR)] + ([(st.pose(), STRETCH_NEAR)] if st else [])
+                if p and p["posture"] == "lying" and any(math.hypot(p["x"] - q[0], p["y"] - q[1]) < r for q, r in near):
+                    continue
                 if p:
                     # 足元が床の高さの違う部屋 (玄関の土間) に落ちたら、その床の高さで計算し直す
                     r = self.rooms.get(self.w.room_of(p["x"], p["y"], self.rooms[c["room"]]["level"]) or "")

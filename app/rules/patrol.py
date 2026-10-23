@@ -19,7 +19,7 @@ from .base import LABEL, M, Job, Rule, result_json
 
 SAME_OBJECT = 0.2      # 同じ物とみなす距離 [m]
 PICK_RETRY = 1         # 拾うのに失敗したらやり直す回数
-FEET = 0.3             # 人の足元とみなす距離 [m]
+FEET = 0.5             # 人の足元とみなす距離 [m]
 CHILD_NEAR = 1.5       # 子どもがこれより近くにいれば声をかける [m]
 KIND_LABEL = {"button_battery": "ボタン電池", "coin": "硬貨", "marble": "ビー玉", "toy_block": "小さいブロック",
               "scissors": "ハサミ"}
@@ -40,6 +40,7 @@ class Patrol(Rule):
         c.m.subscribe(topic("factsheet", serial=STRETCH_SERIAL), lambda t, p: setattr(self, "has_stretch", True))
         self.tidy = None          # 片付け中の {"obj", "stage": pick/drop, "aid"}
         self.n = 0
+        self.todo = []            # 見回りでまだ見ていない所 (中断したら、ここから続ける)
 
     def step(self):
         c = self.c
@@ -52,12 +53,19 @@ class Patrol(Rule):
         if want and not c.busy("patrol"):
             self.requests.clear()
             self._start()
+        elif self.todo and not c.busy("patrol") and c.job is None and not c.jobs:
+            # ほかの仕事 (転倒の確認など) で中断した見回りを、まだ見ていない所から続ける
+            self._start(self.todo)
 
-    def _start(self):
+    def _start(self, pts=None):
         c = self.c
         self.last = c.time
-        pts = self.cfg["points"]
-        c.log(f"見回りを始める ({len(pts)} か所、床の小さい物を探す)", kind="patrol_start")
+        if pts is None:
+            pts = self.cfg["points"]
+            c.log(f"見回りを始める ({len(pts)} か所、床の小さい物を探す)", kind="patrol_start")
+        else:
+            c.log(f"中断した見回りの続き (残り {len(pts)} か所)", kind="patrol_resume")
+        self.todo = list(pts)
         job = Job("patrol", 2)
         job.interruptible = True
         for p in pts:
@@ -70,6 +78,8 @@ class Patrol(Rule):
 
     def _result(self, j, p):
         c = self.c
+        if p in self.todo:
+            self.todo.remove(p)
         res = result_json(j.last[0] if j.last else None)
         for o in res.get("objects", []):
             same = next((f for f in self.found if f["kind"] == o["kind"]
@@ -103,8 +113,14 @@ class Patrol(Rule):
     def _st_action(self, aid):
         return next((s for s in self.st_state.get("actionStates", []) if s["actionId"] == aid), None)
 
-    def _send(self, obj, stage):
+    def _send(self, obj, stage, force=False):
         c = self.c
+        if self.st_state.get("nodeStates") and not force:
+            # 前の order のノードがまだ残っている (アクションは終わってもノードを進める前): 今送ると
+            # 「busy」で断られるので、残りが無くなってから送る (_step_tidy)
+            waiting = self.tidy is not None and self.tidy["aid"] is None
+            self.tidy = {"obj": obj, "stage": stage, "aid": None, "t": self.tidy["t"] if waiting else c.time}
+            return
         self.n += 1
         oid = f"tidy-{self.n}"
         if stage == "pick":
@@ -132,7 +148,7 @@ class Patrol(Rule):
             sp = self.st_state["agvPosition"]
             todo = min((f for f in self.found if f["state"] == "found"), default=None,
                        key=lambda f: math.hypot(f["x"] - sp["x"], f["y"] - sp["y"]))
-            if todo and c.busy("patrol"):
+            if todo and (c.busy("patrol") or self.todo):
                 return          # アヒルが見回っている間は待つ (同じ部屋で 2 台がぶつからないように)
             if todo:
                 todo["state"] = "tidying"
@@ -141,6 +157,9 @@ class Patrol(Rule):
                 self._send(todo, "pick")
             return
         t = self.tidy
+        if t["aid"] is None:
+            self._send(t["obj"], t["stage"], force=c.time - t["t"] > 30)     # 30 秒待っても残っていれば送る
+            return
         st = self._st_action(t["aid"])
         if st is None or st["actionStatus"] not in ("FINISHED", "FAILED"):
             if c.time - t["t"] > 300:
@@ -202,6 +221,7 @@ class Patrol(Rule):
 
     def _done(self, j):
         c = self.c
+        self.todo = []
         n = sum(1 for f in self.found if f["state"] == "found")
         c.log(f"見回りが終わった (床の小さい物: {n} 個)", kind="patrol_done", count=n)
         d = c.home["robot"]["dock"]

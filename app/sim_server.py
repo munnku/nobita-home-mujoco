@@ -98,7 +98,8 @@ def main():
             mq.publish("sim/truth", {"time": round(w.time, 1), "persons": w.person_state,
                                      "objects": {n: [round(v, 2) for v in xy] for n, xy in w.objects.on_floor().items()},
                                      "robot": dict(zip(("x", "y", "theta"), (round(v, 2) for v in w.duck.pose()))),
-                                     "fallen": bool(w.duck.fallen()),
+                                     "fallen": bool(w.duck.fallen()), "recovering": bool(w.duck.recovering),
+                                     "duck_z": round(float(w.data.qpos[w.duck.qa + 2]), 3),
                                      "stretch": (dict(zip(("x", "y", "theta"), (round(v, 2) for v in w.stretch.pose())))
                                                  if w.stretch else None)})
         if viewer is not None:

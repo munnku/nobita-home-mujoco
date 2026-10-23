@@ -33,7 +33,8 @@ LIGHT_ON = np.array([0.45, 0.44, 0.40])
 POLICY_SPEED = {"velstand": (0.3, 0.0), "alpha_walking": (0.3, 0.0), "nobita_walk": (0.4, 0.32),
                 "nobita_walk2": (0.4, 0.3)}
 DUCK_MIN_WZ = 0.7     # その場で回る指令の下限 [rad/s] (歩きの方策は小さい回転の指令を「止まれ」として扱う)
-MAX_RETRIES = 3       # 進まなくなったときに経路を作り直す回数
+BACK_VX, BACK_TIME = -0.4, 1.5   # 進まなくなったら後ろへ下がる指令 [m/s] と時間 [s] (-0.3 より遅い指令では下がらない)
+MAX_RETRIES = 3      # 進まなくなったときに経路を作り直す回数
 STRETCH_RADIUS = BASE_RADIUS + 0.07     # Stretch の地図で壁・家具から離す距離 [m]
 STRETCH_KEEP_OUT = 0.28                 # Stretch が床の物から離れて通る距離 [m] (台車の角まで約 0.24 m)
 STRETCH_SPEED = 0.25                    # Stretch の前進の上限 [m/s]
@@ -86,6 +87,7 @@ class World:
         self.nav = Navigator(*POLICY_SPEED.get(key, (0.3, 0.0)), min_wz=DUCK_MIN_WZ)
         self.policy_name = key
         self.goal, self.retries, self.last_path = None, 0, None
+        self._back_until = None   # 進まなくなって後ろへ下がっている間の終わりの時刻
         self.manual_cmd = (0.0, 0.0, 0.0)
         self.time = 0.0
         self._renderers = {}
@@ -96,13 +98,20 @@ class World:
         if not self.nav.done:
             vx, wz = self.nav.update(*self.duck.pose())
             self.duck.set_cmd(vx, 0.0, wz)
-        else:
-            self.duck.set_cmd(*self.manual_cmd)
-            if self.nav.stuck and self.goal is not None and self.retries < MAX_RETRIES:
-                # 進まなくなった: いまの位置から経路を作り直す
+        elif self.nav.stuck and self.goal is not None and self.retries < MAX_RETRIES:
+            # 進まなくなった (壁の角に引っかかるなど。pure pursuit は少し先を狙うので角を内側から回る):
+            # 少し後ろへ下がってから、いまの位置から経路を作り直す
+            if self._back_until is None:
+                self._back_until = self.time + BACK_TIME
+            if self.time < self._back_until:
+                self.duck.set_cmd(BACK_VX, 0.0, 0.0)
+            else:
+                self._back_until = None
                 self.retries += 1
                 if not self._plan(*self.goal):
                     self.goal = None
+        else:
+            self.duck.set_cmd(*self.manual_cmd)
         if self.stretch:
             if not self.st_nav.done:
                 self.stretch.drive(*self.st_nav.update(*self.stretch.pose()))
@@ -111,18 +120,31 @@ class World:
                 self.stretch.drive(0.0, 0.0)
                 self.st_driving = False
             self.stretch.update()
+        if self.objects:
+            self._unstick_objects()
         self.duck.step()
         self.time += 0.02
+
+    def _unstick_objects(self):
+        """床に置いた物の真ん中が床より下に沈んでいたら、床の上に戻す (シミュレーションの現象の補正。片付けの箱の中は除く)。"""
+        bx, by, bw, bd, _ = TIDY_BOX
+        bx, by = bx * self.module, by * self.module
+        for n, s in self.objects.state.items():
+            if s is None:
+                continue
+            p = self.objects.pos(n)
+            if -0.05 < p[2] < -0.001 and not (abs(p[0] - bx) < bw / 2 + 0.05 and abs(p[1] - by) < bd / 2 + 0.05):
+                self.objects.unstick(n)
 
     # ---- 移動
     def go_to(self, x, y, yaw=None, tolerance=None):
         """(x, y) [m] へ向かう経路を作ってアヒルに渡す。経路がなければ False。
         tolerance: (x, y) からこの距離に入れば着いたとする (人のそばなど、その点には立てないとき)。"""
-        self.goal, self.retries = (x, y, yaw, tolerance), 0
+        self.goal, self.retries, self._back_until = (x, y, yaw, tolerance), 0, None
         return self._plan(x, y, yaw, tolerance)
 
     def stop(self):
-        self.goal = None
+        self.goal, self._back_until = None, None
         self.nav.stop()
         self.manual_cmd = (0.0, 0.0, 0.0)
 

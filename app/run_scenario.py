@@ -49,7 +49,7 @@ def main():
     def on_truth(t, p):
         truth.update(p)
         track.append({"time": p.get("time"), "robot": p.get("robot"), "fallen": p.get("fallen"),
-                      "stretch": p.get("stretch")})
+                      "recovering": p.get("recovering"), "duck_z": p.get("duck_z"), "stretch": p.get("stretch")})
     m.subscribe("sim/truth", on_truth)
     status = {}
     m.subscribe("sim/status", lambda t, p: status.update(s=p))

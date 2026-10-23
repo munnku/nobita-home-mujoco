@@ -169,10 +169,11 @@ class FloorMap:
         """start, goal: (x, y) [m]。通れる経路の点列 [m] (間引いたもの) か None を返す。"""
         s = self.nearest_free(*start, max_r=1.0)      # ロボットが家具の近くにずれていても出られるように
         g = self.nearest_free(*goal)
-        if s is None or g is None:
+        if s is None:
             return None
         walk = self.reach(start)
-        if not np.isfinite(walk[g]):
+        if g is None or not np.isfinite(walk[g]):
+            # (目的地の 1 m 以内に通れる所が無いときも。開いた玄関の扉が土間の前をふさぐなど)
             # 目的地のそばへは行けない (人や家具でふさがれている): 歩いて行ける所のうち目的地に一番近い所へ
             gi, gj = self.to_cell(*goal)
             ii, jj = np.nonzero(np.isfinite(walk))
