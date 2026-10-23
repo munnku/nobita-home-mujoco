@@ -180,13 +180,19 @@ class HazardDetector:
         return out
 
 
+# 床の物の真ん中の高さ [m] (物の高さの半分。実物の大きさ: ボタン電池 3.2 mm、硬貨 1.6 mm、ビー玉 17 mm ...)
+OBJECT_MID_Z = {"button_battery": 0.0016, "coin": 0.0008, "marble": 0.0085, "toy_block": 0.0057, "scissors": 0.004}
+
+
 def estimate_object(cam, box, floor_z=0.0):
-    """床の物の枠から床の上の位置 {'x','y','kind','score'} (枠の真ん中の視線と床の交点。物は低いので床とみなす)。"""
+    """床の物の枠から床の上の位置 {'x','y','kind','score'}。
+    枠の真ん中の視線と、物の真ん中の高さの水平面の交点。床の面と交わらせると、低い目 (アヒルは約 0.2 m) から
+    斜めに見るので、高さ h の所を通る視線は物の向こうへ h × 距離 / 目の高さ ずれる (ビー玉で 1 m 先なら約 4 cm)。"""
     x1, y1, x2, y2, score, kind = box[:6]
-    p = cam.floor_point((x1 + x2) / 2, (y1 + y2) / 2, floor_z)
+    p = cam.floor_point((x1 + x2) / 2, (y1 + y2) / 2, floor_z + OBJECT_MID_Z.get(kind, 0.0))
     if p is None:
         return None
-    return {"kind": kind, "x": round(float(p[0]), 2), "y": round(float(p[1]), 2), "score": round(score, 2)}
+    return {"kind": kind, "x": round(float(p[0]), 3), "y": round(float(p[1]), 3), "score": round(score, 2)}
 
 
 # ---- 家にいるほかのロボット (片付け係の Stretch) を人と間違えない

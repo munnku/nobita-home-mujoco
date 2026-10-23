@@ -8,6 +8,7 @@
   その部屋のスピーカーと、アヒルが「さわらないでね」と声をかける
 - 片付け: 拾うロボット (Stretch 3、VDA 5050 の stretch-01) がいれば、見つけた順に order を出す
   (物の所で pick → 片付けの箱で drop → 待機場所へ戻る)。アヒルとぶつからないよう、見回りが終わってから始める。
+  Stretch に近い物から拾う
   いなければ保護者に片付けを頼む
 """
 import math
@@ -17,6 +18,8 @@ from home.vda5050 import STRETCH_SERIAL, action, make_order, topic
 from .base import LABEL, M, Job, Rule, result_json
 
 SAME_OBJECT = 0.2      # 同じ物とみなす距離 [m]
+PICK_RETRY = 1         # 拾うのに失敗したらやり直す回数
+FEET = 0.3             # 人の足元とみなす距離 [m]
 CHILD_NEAR = 1.5       # 子どもがこれより近くにいれば声をかける [m]
 KIND_LABEL = {"button_battery": "ボタン電池", "coin": "硬貨", "marble": "ビー玉", "toy_block": "小さいブロック",
               "scissors": "ハサミ"}
@@ -75,6 +78,10 @@ class Patrol(Rule):
                 same.update(score=max(same["score"], o["score"]))
                 continue
             room = o.get("room") or "?"
+            if self._at_feet(o):
+                c.log(f"{KIND_LABEL.get(o['kind'], o['kind'])}らしい物 ({o['x']:.2f}, {o['y']:.2f}) は人の足元なので、"
+                      "見間違いとして扱う", kind="hazard_feet", hazard=o["kind"])
+                continue
             f = {**o, "room": room, "time": round(c.time, 1), "state": "found"}
             self.found.append(f)
             what, where = KIND_LABEL.get(o["kind"], o["kind"]), LABEL.get(room, room)
@@ -121,7 +128,10 @@ class Patrol(Rule):
         if not self.has_stretch or "agvPosition" not in self.st_state:
             return
         if self.tidy is None:
-            todo = next((f for f in self.found if f["state"] == "found"), None)
+            # Stretch に近い物から拾う (遠い物へ行く途中で、狭い廊下の物を避けきれず踏まないように)
+            sp = self.st_state["agvPosition"]
+            todo = min((f for f in self.found if f["state"] == "found"), default=None,
+                       key=lambda f: math.hypot(f["x"] - sp["x"], f["y"] - sp["y"]))
             if todo and c.busy("patrol"):
                 return          # アヒルが見回っている間は待つ (同じ部屋で 2 台がぶつからないように)
             if todo:
@@ -152,6 +162,10 @@ class Patrol(Rule):
                                         "object": obj["kind"], "time": round(c.time, 1),
                                         "summary": f"{where}の床に落ちていた{what}を、片付けロボットが箱に片付けました。"}, qos=1)
             self._after(obj)
+        elif t["stage"] == "pick" and obj.get("tries", 0) < PICK_RETRY and st.get("resultDescription") != "時間切れ":
+            obj["tries"] = obj.get("tries", 0) + 1         # 拾えなかった: 台車の位置から合わせ直して、もう一度だけ
+            c.log(f"{what}を拾えなかった ({st.get('resultDescription')}) → もう一度", kind="tidy_retry", hazard=obj["kind"])
+            self._send(obj, "pick")
         else:
             obj["state"] = "failed"
             c.log(f"{what}を片付けられなかった ({st.get('resultDescription')}) → 保護者に頼む", kind="tidy_failed",
@@ -168,6 +182,12 @@ class Patrol(Rule):
             self.tidy = None
         else:
             self._send(obj, "home")
+
+    def _at_feet(self, o):
+        """見守りカメラで見えている人の足元 (FEET 以内) か。足や靴下を小さい物と見間違えやすい。"""
+        c = self.c
+        return any(math.hypot(p["x"] - o["x"], p["y"] - o["y"]) < FEET
+                   for t, persons in c.persons.values() if c.time - t <= 3.0 for p in persons)
 
     def _child_near(self, o):
         """見守りカメラで、子どもが物の近くにいるか (いれば部屋の名前)。"""

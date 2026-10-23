@@ -54,6 +54,7 @@ REACH_MIN, REACH_MAX = 0.02, 0.50   # 腕の伸び (arm の指令) の範囲
 REACH_DEFAULT = 0.25        # arm_side_point() で台車を置くときの腕の伸び
 SMALL_WIDTH = 0.025         # 幅が分からないときの物の幅
 TIP_LEVEL = 0.21            # 指先のゴムの受動関節 (rubber_*_y) のばねの中立 [rad]。元は 0 (パッドが 12° 内に傾いた V 字)
+DROP_TOL = 0.03             # 箱に落とすときの位置合わせの誤差 [m]
 ALIGN_MAX = 1.0             # 前後の位置合わせで台車が自分で動く距離の上限 [m] (それより遠ければナビで近づける)
 
 
@@ -460,17 +461,19 @@ class Stretch:
 
     def _fail(self, why):
         self.stop()
+        # 腕を縮めて上げておく (伸ばしたまま走ると、腕が低い家具 (ちゃぶ台) に引っかかる)。持っている物は持ったまま
+        self.set_targets(arm=0.0, lift=max(LIFT_CARRY, self.joints()["lift"]))
         self.status = "failed"
         self.reason = why
         return self.status
 
-    def _align_base(self, target):
-        """台車を前後に動かして、掴む点の前後の位置を target に合わせる。合えば True。"""
+    def _align_base(self, target, tol=0.003):
+        """台車を前後に動かして、掴む点の前後の位置を target に合わせる (誤差 tol [m] まで)。合えば True。"""
         yaw = self.pose()[2]
         if self._yaw_ref is None:           # 腕が横に出ていると左右の車輪の荷重が違い、まっすぐ進まないので向きを保つ
             self._yaw_ref = yaw
         ex = float(self.to_base(target)[0] - self.to_base(self.grasp_point())[0])
-        if abs(ex) < 0.003 and self.base_speed() < 0.005:
+        if abs(ex) < tol and self.base_speed() < 0.005:
             self.stop()
             return True
         self.drive(float(np.clip(1.5 * ex, -0.12, 0.12)), float(np.clip(1.0 * _wrap(self._yaw_ref - yaw), -0.15, 0.15)))
@@ -485,15 +488,15 @@ class Stretch:
         ex = math.cos(yaw) * (hx - x) + math.sin(yaw) * (hy - y)
         self.drive(float(np.clip(2.0 * ex, -0.03, 0.03)), float(np.clip(2.0 * _wrap(hyaw - yaw), -0.1, 0.1)))
 
-    def _align_arm(self, target):
-        """腕の伸びで、掴む点の横の位置を target に合わせる。合えば True。"""
+    def _align_arm(self, target, tol=0.003):
+        """腕の伸びで、掴む点の横の位置を target に合わせる (誤差 tol [m] まで)。合えば True。"""
         b, g = self.to_base(target), self.to_base(self.grasp_point())
         ey = float(b[1] - g[1]) / self.gc_dy
         arm = self.joints()["arm"] + ey
         if not REACH_MIN <= arm <= REACH_MAX:
             return None
         self.set_targets(arm=arm)
-        return abs(ey) < 0.003 and self.settled(("arm",), tol=0.004)
+        return abs(ey) < tol and self.settled(("arm",), tol=max(tol, 0.004))
 
     def pick_step(self, target_xyz, yaw=0.0, width=SMALL_WIDTH):
         """毎ステップ呼ぶ。'running' / 'done' (掴んで持ち上げ腕を縮めた) / 'failed' (self.reason に理由)。
@@ -608,9 +611,9 @@ class Stretch:
         if ph == "raise":
             if self.settled(("lift",), tol=0.02) or self._elapsed() > 5:
                 self._go("align")
-        elif ph == "align":
-            ok_base = self._align_base(target)
-            ok_arm = self._align_arm(target) if ok_base else False
+        elif ph == "align":          # 箱の口 (30 × 25 cm) に落とすだけなので、拾うときほど細かく合わせない
+            ok_base = self._align_base(target, tol=DROP_TOL)
+            ok_arm = self._align_arm(target, tol=DROP_TOL) if ok_base else False
             if ok_arm is None:
                 return self._fail("腕の伸びの範囲を超えた")
             if ok_base and ok_arm:

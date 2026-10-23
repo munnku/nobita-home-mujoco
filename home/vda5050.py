@@ -31,8 +31,13 @@ MAP_ID = "nobita-1F"
 HAZARD_NECK = -0.8    # 床の物を探すときの首の角度 (下向き) [rad]
 SAME_OBJECT = 0.2     # 同じ物とみなす距離 [m]
 STUCK_FALLEN = 20.0   # 転んでこれだけ起き上がれなければ「助けが要る」と知らせる [s]
-HAZARD_RANGE = 2.5
-HAZARD_TURN = 0.4     # 床の物を探すときに回る速さ [rad/s] (首を下げて速く回ると位置がずれる)    # 床の物はこれより近い推定だけ使う [m]
+TARGET_BEARING = 0.35  # 足元の見えない枠を target の人とみなす向きのずれの上限 [rad]
+EDGE = 4              # 絵の縁からこれだけ [px] の所にかかる枠は使わない
+HAZARD_RANGE = 2.5    # 床の物はこれより近い推定だけ使う [m]
+HAZARD_TURN = 0.8     # 床の物を探すときに回る指令 [rad/s]。歩きの方策は 0.65 より小さい回転の指令ではほとんど回らない
+                      # (実際は約 0.5 rad/s。首を下げて速く回ると位置がずれるので、ずれは前後・左右の指令で戻す)
+MIN_TURN = 0.7        # 歩きの方策が回り始める回転の指令の下限 [rad/s] (これより小さいと止まれとして扱われる)
+HAZARD_REPORT = 0.55  # 1 周のうちの一番高い score がこれより低いか、1 回しか見えなかった物は知らせない (壁際・足元の見間違い)
 HEAR_RADIUS = 4.0     # アヒルのマイクに声が届く距離 [m] (同じ部屋ならこれより遠くても届く)
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ALERT_DIR = os.path.join(ROOT, "build", "alerts")
@@ -40,6 +45,13 @@ ALERT_DIR = os.path.join(ROOT, "build", "alerts")
 
 def topic(name, manufacturer=MANUFACTURER, serial=SERIAL):
     return f"uagv/v2/{manufacturer}/{serial}/{name}"
+
+
+def turn_cmd(err, gain, limit, dead=0.0):
+    """向きの誤差 err [rad] を減らす回転の指令。小さい指令では回らないので、MIN_TURN より小さくしない (dead 以内なら 0)。"""
+    if abs(err) <= dead:
+        return 0.0
+    return math.copysign(min(limit, max(MIN_TURN, gain * abs(err))), err)
 
 
 def now_iso():
@@ -497,36 +509,62 @@ class Agent:
             cam = CameraModel.from_mujoco(self.w.model, self.w.data, "head_camera", 640, 480)
             x0, y0, _ = self._pose()
             for b in self.hazard.detect([img])[0]:
+                if b[3] >= 480 - EDGE:
+                    continue        # 絵の下の縁にかかる枠 (物の一部しか写っていないか、アヒル自身の体) は使わない
                 est = estimate_object(cam, b, 0.0)
+                if os.environ.get("HAZARD_DEBUG"):
+                    print(f"[hazard] t={self.w.time:.1f} duck=({x0:.2f},{y0:.2f}) box={[int(v) for v in b[:4]]} "
+                          f"est={est and (est['kind'], est['x'], est['y'], round(est['score'], 2))}", flush=True)
                 # 遠すぎる (地平線の近くの枠は床に落とすと大きくずれる) か、家の外に落ちた推定は使わない
                 if est is None or math.hypot(est["x"] - x0, est["y"] - y0) > HAZARD_RANGE                         or self.w.room_of(est["x"], est["y"]) is None:
                     continue
                 same = next((o for o in objs if o["kind"] == est["kind"]
                              and math.hypot(o["x"] - est["x"], o["y"] - est["y"]) < SAME_OBJECT), None)
+                shot = (img, [int(v) for v in b[:4]])          # 一番 score の高かった絵を証拠に残す
+                # 位置は見えた絵ごとの推定の重み付き平均 (近いほど・score が高いほど重い。遠い絵は 1 画素のずれが大きい)
+                wt = est["score"] / max(0.3, math.hypot(est["x"] - x0, est["y"] - y0)) ** 2
                 if same is None:
-                    objs.append({**est, "room": self.w.room_of(est["x"], est["y"]), "n": 1})
-                    run.setdefault("shots", []).append((img, [int(v) for v in b[:4]]))
+                    objs.append({**est, "room": self.w.room_of(est["x"], est["y"]), "n": 1, "shot": shot,
+                                 "sw": wt, "sx": wt * est["x"], "sy": wt * est["y"]})
                 else:
                     same["n"] += 1
-                    same["score"] = max(same["score"], est["score"])
+                    same["sw"] += wt
+                    same["sx"] += wt * est["x"]
+                    same["sy"] += wt * est["y"]
+                    same["x"], same["y"] = same["sx"] / same["sw"], same["sy"] / same["sw"]
+                    if est["score"] > same["score"]:
+                        same["score"], same["shot"] = est["score"], shot
         if el >= float(run["p"].get("duration", 11.0)):
             self.w.set_manual_cmd(0.0, 0.0, 0.0)
             self.w.duck.set_head()
-            found = [{k: v for k, v in o.items() if k != "n"} for o in objs]
-            img = None
-            if run.get("shots") and str(run["p"].get("privacy", "")).lower() not in ("true", "1"):
-                import cv2
-                os.makedirs(ALERT_DIR, exist_ok=True)
-                im, box = run["shots"][0]
-                vis = np.ascontiguousarray(im[..., ::-1])
-                cv2.rectangle(vis, (box[0] - 4, box[1] - 4), (box[2] + 4, box[3] + 4), (40, 40, 230), 2)
-                path = os.path.join(ALERT_DIR, f"{run['id']}_{self.w.time:.0f}.jpg")
-                cv2.imwrite(path, vis)
-                img = os.path.relpath(path, ROOT).replace("\\", "/")
-            for o in found:
-                o["image"] = img
+            found = []
+            for k, o in enumerate(x for x in objs if x["score"] >= HAZARD_REPORT and x["n"] >= 2):
+                img = None
+                if str(run["p"].get("privacy", "")).lower() not in ("true", "1"):
+                    import cv2
+                    os.makedirs(ALERT_DIR, exist_ok=True)
+                    im, box = o["shot"]
+                    vis = np.ascontiguousarray(im[..., ::-1])
+                    cv2.rectangle(vis, (box[0] - 4, box[1] - 4), (box[2] + 4, box[3] + 4), (40, 40, 230), 2)
+                    path = os.path.join(ALERT_DIR, f"{run['id']}_{self.w.time:.0f}_{k}.jpg")
+                    cv2.imwrite(path, vis)
+                    img = os.path.relpath(path, ROOT).replace("\\", "/")
+                found.append({**{a: v for a, v in o.items() if a not in ("n", "shot", "sw", "sx", "sy")},
+                              "x": round(o["x"], 3), "y": round(o["y"], 3), "image": img})
             return True, True, json.dumps({"found": bool(found), "objects": found}, ensure_ascii=False)
         return False, False, ""
+
+    def _seen_at_target(self, cam, b, p):
+        """足元が家具 (ちゃぶ台など) に隠れて床に落とせない枠でも、target の方向に見えていれば、そこにいるとみなす
+        (姿勢は学習した YOLO のクラス)。アヒルの目は低いので、立った子どもの脚がちゃぶ台に隠れると枠の下端が目より高くなる。"""
+        d = cam.ray((b[0] + b[2]) / 2, (b[1] + b[3]) / 2)
+        x, y, _ = self.w.duck.pose()
+        tx, ty = float(p["targetX"]), float(p["targetY"])
+        off = (math.atan2(d[1], d[0]) - math.atan2(ty - y, tx - x) + math.pi) % (2 * math.pi) - math.pi
+        if abs(off) > TARGET_BEARING:
+            return None
+        return {"x": tx, "y": ty, "posture": b[5], "height": None, "length": None, "score": round(float(b[4]), 2),
+                "occluded": True}
 
     def _step_detect(self, run, el):
         """人を探す: target があればそちらを向き、見えなければ左右に首 (体) を振る。最も確かな検出を返す。"""
@@ -535,8 +573,8 @@ class Agent:
         if run["phase"] == "face" and "targetX" in p:
             want = math.atan2(float(p["targetY"]) - y, float(p["targetX"]) - x)
             err = (want - th + math.pi) % (2 * math.pi) - math.pi
-            if abs(err) > 0.15 and el < 6.0:
-                self.w.set_manual_cmd(0.0, 0.0, max(-1.0, min(1.0, 1.5 * err + math.copysign(0.3, err))))
+            if abs(err) > 0.2 and el < 6.0:              # (回転の指令は MIN_TURN 以上なので、細かくは合わせない)
+                self.w.set_manual_cmd(0.0, 0.0, turn_cmd(err, 1.5, 1.0))
                 return False, False, ""
             run["phase"], run["t_scan"], run["yaw0"] = "scan", self.w.time, th
         elif run["phase"] == "face":
@@ -550,10 +588,16 @@ class Agent:
             cam = CameraModel.from_mujoco(self.w.model, self.w.data, "head_camera", 640, 480)
             st = getattr(self.w, "stretch", None)
             rbox = robot_box(cam, st.pose()) if st else None
+            if os.environ.get("DETECT_DEBUG"):
+                print(f"[detect] t={self.w.time:.1f} ts={ts:.1f} duck={np.round(self.w.duck.pose(), 2).tolist()} "
+                      f"boxes={[[int(v) for v in bb[:4]] + [round(float(bb[4]), 2), bb[5] if len(bb) > 5 else None] for bb in boxes]}",
+                      flush=True)
             for b in boxes:
                 if rbox and covered(b, rbox):
                     continue        # 片付け係の Stretch を人と間違えない
                 est = estimate_person(cam, b, 0.0)
+                if est is None and "targetX" in p and len(b) > 5:
+                    est = self._seen_at_target(cam, b, p)
                 if est and (run["best"] is None or est["score"] > run["best"]["score"]):
                     run["best"] = {**est, "box": [int(v) for v in b[:4]]}
                     run["img"] = img
@@ -564,15 +608,15 @@ class Agent:
         # 部屋を見回す (sweep=full) ときはゆっくり 1 周回る。見つけるまでは止まらない
         if p.get("sweep") == "full":
             if run["best"] is None or run["best"]["posture"] == "unknown":
-                self.w.set_manual_cmd(0.0, 0.0, 0.6)
+                self.w.set_manual_cmd(0.0, 0.0, MIN_TURN + 0.1)
             else:
                 self.w.set_manual_cmd(0.0, 0.0, 0.0)
-        # 見えないうちは左右に振る (±40°)
-        elif run["best"] is None:
-            phase = math.sin(ts * 0.8)
+        # まず 1.5 秒は target の方を見たまま。それでも見えなければ左右に振る (±40°)
+        elif run["best"] is None and ts > 1.5:
+            phase = math.sin((ts - 1.5) * 0.8)
             want = run["yaw0"] + 0.7 * phase
             err = (want - th + math.pi) % (2 * math.pi) - math.pi
-            self.w.set_manual_cmd(0.0, 0.0, max(-0.8, min(0.8, 2.0 * err)))
+            self.w.set_manual_cmd(0.0, 0.0, turn_cmd(err, 2.0, 0.9, dead=0.1))
         else:
             self.w.set_manual_cmd(0.0, 0.0, 0.0)
         if ts >= run["dur"]:
@@ -682,6 +726,11 @@ class StretchAgent(Agent):
             return self.w.time - run["t0"] >= float(p.get("duration", 1.0)), True, ""
         else:
             return True, False, f"unknown action {t}"
+        if os.environ.get("STRETCH_DEBUG") and (st.phase != run.get("phase") or r != "running"):
+            run["phase"] = st.phase
+            print(f"[stretch] t={self.w.time:.1f} {t} {st.phase} {r} {st.reason} base={np.round(st.pose(), 3).tolist()} "
+                  f"grasp={np.round(st.grasp_point(), 3).tolist()} target=({p.get('x')}, {p.get('y')}) "
+                  f"joints={ {k: round(v, 3) for k, v in st.joints().items()} }", flush=True)
         if r == "running":
             return False, False, ""
         if r == "done":

@@ -3,7 +3,7 @@ name: hazard_patrol
 description: アヒルが見回って床の小さい危ない物を見つけ、Stretch 3 が拾って片付ける
 stretch: true
 mode: alone
-duration: 240
+duration: 540        # 見回り (約 4 分) のあと、Stretch が 3 個を片付けるまで
 events:
   - {t: 0, who: tamako, at: outside}
   - {t: 0, who: nobita, at: ousetsu_sofa, pose: stand}

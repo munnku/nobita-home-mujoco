@@ -126,7 +126,12 @@ def check_patrol(events):
             errs.append(((f["x"] - o["x"]) ** 2 + (f["y"] - o["y"]) ** 2) ** 0.5)
     wrong = len(found) - hits
     err = f"位置の誤差 平均 {sum(errs) / len(errs):.2f} m" if errs else ""
-    return hits >= len(placed) - 1 and wrong == 0, f"置いた {len(placed)} 個のうち {hits} 個を見つけた / 誤り {wrong} 個 / {err}"
+    kinds = lambda k: [e["payload"].get("hazard") for e in events if e["topic"] == "home/log"  # noqa: E731
+                       and isinstance(e["payload"], dict) and e["payload"].get("kind") == k]
+    done, failed = kinds("tidy_done"), kinds("tidy_failed")
+    tidy = f"片付けた {len(done)} 個 / 片付けられなかった {len(failed)} 個"
+    ok = hits >= len(placed) - 1 and wrong == 0 and len(done) >= hits - 1
+    return ok, f"置いた {len(placed)} 個のうち {hits} 個を見つけた / 誤り {wrong} 個 / {err} / {tidy}"
 
 
 CHECKS = {"hide_sofa": check_hide, "hide_table": check_hide, "hide_cupboard": check_hide, "hazard_patrol": check_patrol,

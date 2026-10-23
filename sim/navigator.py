@@ -19,9 +19,10 @@ def wrap(a):
 
 
 class Navigator:
-    def __init__(self, max_vx=MAX_VX, min_vx=0.0):
-        """max_vx / min_vx: 前進の指令の上限と下限 (方策によって、小さい指令では足踏みしかしないものがある)。"""
-        self.max_vx, self.min_vx = max_vx, min_vx
+    def __init__(self, max_vx=MAX_VX, min_vx=0.0, min_wz=0.0):
+        """max_vx / min_vx: 前進の指令の上限と下限 (方策によって、小さい指令では足踏みしかしないものがある)。
+        min_wz: その場で回るときの回転の指令の下限 (アヒルの方策は 0.65 rad/s より小さいとほとんど回らない)。"""
+        self.max_vx, self.min_vx, self.min_wz = max_vx, min_vx, min_wz
         self.stop()
 
     def set_path(self, path, goal_yaw=None, target=None, tolerance=None):
@@ -106,4 +107,4 @@ class Navigator:
         if abs(err) < 0.12:
             self.done = True
             return 0.0, 0.0
-        return 0.0, max(-MAX_WZ, min(MAX_WZ, 1.5 * err + math.copysign(0.3, err)))
+        return 0.0, math.copysign(min(MAX_WZ, max(self.min_wz, 1.5 * abs(err) + 0.3)), err)

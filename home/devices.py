@@ -162,11 +162,16 @@ class HomeDevices:
             cam = CameraModel.from_mujoco(self.w.model, self.w.data, c["name"], cfg["width"], cfg["height"])
             floor_z = self.w.layout["levels"][self.rooms[c["room"]]["level"]]["z"]
             persons = []
+            # ロボットの写る範囲。位置は VDA 5050 の state で分かっているので、そこに重なる枠は人として扱わない
+            # (片付け係の Stretch は背が高く人に見え、転んだアヒルは横になった人に見えることがある)
             st = getattr(self.w, "stretch", None)
-            rbox = robot_box(cam, st.pose()) if st else None
+            rboxes = [robot_box(cam, self.w.duck.pose(), half=0.2, height=0.35)]
+            if st:
+                rboxes.append(robot_box(cam, st.pose()))
+            rboxes = [r for r in rboxes if r]
             for b in bxs:
-                if rbox and covered(b, rbox):
-                    continue        # 片付け係の Stretch (背が高く人に見える)。位置は分かっているので人として扱わない
+                if any(covered(b, r) for r in rboxes):
+                    continue
                 p = estimate_person(cam, b, floor_z)
                 if p:
                     # 足元が床の高さの違う部屋 (玄関の土間) に落ちたら、その床の高さで計算し直す

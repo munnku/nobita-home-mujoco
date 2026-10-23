@@ -32,8 +32,10 @@ LIGHT_ON = np.array([0.45, 0.44, 0.40])
 #   velstand (公開): 指令の 1/3 ほどの速さ。nobita_walk (この家で強化学習): 0.4 で 0.34 m/s、0.2 以下では足踏み
 POLICY_SPEED = {"velstand": (0.3, 0.0), "alpha_walking": (0.3, 0.0), "nobita_walk": (0.4, 0.32),
                 "nobita_walk2": (0.4, 0.3)}
+DUCK_MIN_WZ = 0.7     # その場で回る指令の下限 [rad/s] (歩きの方策は小さい回転の指令を「止まれ」として扱う)
 MAX_RETRIES = 3       # 進まなくなったときに経路を作り直す回数
 STRETCH_RADIUS = BASE_RADIUS + 0.07     # Stretch の地図で壁・家具から離す距離 [m]
+STRETCH_KEEP_OUT = 0.28                 # Stretch が床の物から離れて通る距離 [m] (台車の角まで約 0.24 m)
 STRETCH_SPEED = 0.25                    # Stretch の前進の上限 [m/s]
 TIDY_BOX = (1.15, 5.5, 0.30, 0.25, 0.12)  # 片付けの箱 (x, y [マス]、幅・奥行き・高さ [m])。DK の冷蔵庫の東
 
@@ -81,7 +83,7 @@ class World:
             self.st_nav = Navigator(STRETCH_SPEED, 0.0)
             self.st_driving = False
         key = os.path.splitext(os.path.basename(policy))[0]
-        self.nav = Navigator(*POLICY_SPEED.get(key, (0.3, 0.0)))
+        self.nav = Navigator(*POLICY_SPEED.get(key, (0.3, 0.0)), min_wz=DUCK_MIN_WZ)
         self.policy_name = key
         self.goal, self.retries, self.last_path = None, 0, None
         self.manual_cmd = (0.0, 0.0, 0.0)
@@ -153,7 +155,8 @@ class World:
         x, y, w, d, h = TIDY_BOX
         b = spec.worldbody.add_body(name="tidy_box", pos=[x * mod, y * mod, 0.0])
         t = 0.01
-        for name, pos, size in (("floor", [0, 0, t / 2], [w / 2, d / 2, t / 2]),
+        tf = 0.03       # 底は厚く (薄い物を落とすと 1 ステップで 1 cm ほど進み、1 cm の底はすり抜ける)
+        for name, pos, size in (("floor", [0, 0, tf / 2], [w / 2, d / 2, tf / 2]),
                                 ("n", [0, d / 2, h / 2], [w / 2, t / 2, h / 2]), ("s", [0, -d / 2, h / 2], [w / 2, t / 2, h / 2]),
                                 ("e", [w / 2, 0, h / 2], [t / 2, d / 2, h / 2]), ("w", [-w / 2, 0, h / 2], [t / 2, d / 2, h / 2])):
             b.add_geom(name=f"tidy_box_{name}", type=mujoco.mjtGeom.mjGEOM_BOX, pos=pos, size=size,
@@ -164,9 +167,28 @@ class World:
         return (x * self.module, y * self.module, 0.0)
 
     def stretch_go_to(self, x, y, yaw=None, tolerance=0.08):
-        """Stretch の台車を (x, y) へ (着いたら yaw を向く)。経路がなければ False。"""
+        """Stretch の台車を (x, y) へ (着いたら yaw を向く)。経路がなければ False。
+        床に落ちている物の周り (STRETCH_KEEP_OUT) は通らない。車輪が薄い物 (硬貨・電池) を踏むと、物が床の中に
+        めり込んで抜けなくなり (軽い物の接触が振動し続ける MuJoCo の現象)、拾えなくなる。避けると目的地に
+        届かないときだけ、ふつうの経路にする。"""
         px, py, _ = self.stretch.pose()
-        path = self.st_map.plan((px, py), (x, y))
+        fm = self.st_map
+        free = fm.free
+        if self.objects:
+            ii, jj = np.meshgrid(np.arange(fm.w), np.arange(fm.h), indexing="ij")
+            cx, cy = fm.to_xy(ii, jj)
+            keep = free.copy()
+            for n in self.objects.names:
+                p = self.objects.pos(n)
+                if -0.05 < p[2] < 0.03:                  # 床の上 (持っている物・隠してある物は除く)
+                    keep &= (cx - p[0]) ** 2 + (cy - p[1]) ** 2 > STRETCH_KEEP_OUT ** 2
+            fm.free = keep
+        try:
+            path = fm.plan((px, py), (x, y))
+        finally:
+            fm.free = free
+        if path is None or math.hypot(path[-1][0] - x, path[-1][1] - y) > 0.15:
+            path = fm.plan((px, py), (x, y))
         if path is None:
             return False
         self.st_nav.set_path(path, goal_yaw=yaw, target=(x, y), tolerance=tolerance)

@@ -7,7 +7,7 @@
   2. 部屋の入口あたり (いつもの場所) から、アヒルの低い目では家具に隠れて見えない所
   を選び、家具の種類ごとの見込み (PRIOR、「子どもは押入やソファの陰に隠れやすい」) を掛けて点数にする。
   カメラの無い部屋 (トイレ・脱衣所・浴室) も候補にする
-- 探し方: 点数 ÷ (1 + 歩く距離/3 m) の高い順に、その所を見通せる立ち位置 (FloorMap.viewpoint) へ行って探す
+- 探し方: 点数 ÷ (1 + 家の地図の上の歩く距離/3 m) が高い所を、いまの所から順につないで、その所を見通せる立ち位置 (FloorMap.viewpoint) へ行って探す
   (detectObject)。見つけたら「みーつけた！」
 - HIDE_LLM=claude-code / api なら、候補の一覧を LLM にも並べ替えさせる (最終テストと動画用)
 """
@@ -136,13 +136,33 @@ class HideSeek(Rule):
                 c.log("アヒルが近づきにくい所 (遠くから探す): " + ", ".join(s["name"] for s in skip), kind="hide_skip")
         pos = c.robot.get("agvPosition", {})
         here = (pos.get("x", 0.0), pos.get("y", 0.0))
-        order = sorted(self.spots, key=lambda s: -s["score"] / (1 + math.hypot(s["x"] - here[0], s["y"] - here[1]) / 3))
+        order = self._tour(here)
         order = self._llm_order(order) or order
         c.log("隠れていそうな所 (この順に探す): " + ", ".join(f"{s['name']} {s['score']}" for s in order[:6]),
               kind="hide_plan", spots=[s["name"] for s in order])
         self.state = "searching"
         j.order, j.tried = order, 0
         self._next(j)
+
+    def _tour(self, here):
+        """探す順: いまの所から「点数 ÷ (1 + 歩く距離/3 m)」が一番高い所を選び、そこから次を選ぶ、を繰り返す。
+        歩く距離は家の地図の上の道のり (家具や壁を回り込む。まっすぐの距離だと、近く見えて遠い所を先にしてしまう)。"""
+        from .predict import DistanceFields, Predict
+        pred = next((r for r in self.c.rules if isinstance(r, Predict) and r.df is not None), None)
+        df = pred.df if pred else DistanceFields(os.path.join(self.c.root, "houses", "nobita"), [])
+        left, order, at = list(self.spots), [], here
+        while left:
+            field = df._field((at[0] - 0.1, at[0] + 0.1, at[1] - 0.1, at[1] + 0.1))
+
+            def walk(s):
+                cell = df.map.nearest_free(s["x"], s["y"], max_r=0.6)
+                d = float(field[cell]) if cell else math.inf
+                return d if math.isfinite(d) else 2.0 * math.hypot(s["x"] - at[0], s["y"] - at[1])
+            best = max(left, key=lambda s: s["score"] / (1 + walk(s) / 3))
+            order.append(best)
+            left.remove(best)
+            at = (best["x"], best["y"])
+        return order
 
     def _next(self, j):
         c = self.c
