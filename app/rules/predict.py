@@ -51,6 +51,7 @@ class DistanceFields:
         from floormap import FloorMap
         from house import build_with_info, load
         lay = load(house_dir)
+        self.lay = lay
         xml, door_open = build_with_info(house_dir)
         model = mujoco.MjSpec.from_string(xml).compile()
         data = mujoco.MjData(model)
@@ -208,6 +209,8 @@ class Predict(Rule):
     def _prepare(self, name, h, tr, p, eta, dist):
         """アヒルが危ない場所の手前へ向かう (まだ声はかけない)。"""
         c = self.c
+        if c.game:
+            return                          # かくれんぼの最中はアヒルは遊んでいる (走り回るのは遊び)
         if name in self.active or c.time - h.get("_last", -1e9) < 60.0:
             return
         for other, a in list(self.active.items()):
@@ -230,6 +233,16 @@ class Predict(Rule):
         c = self.c
         a = self.active.get(name)
         if a and a.get("warned"):
+            return
+        if c.game:
+            # かくれんぼの最中は、外へ出る・お風呂のような重い危なさだけスピーカーで警告する (アヒルは遊びを続ける)
+            if float(h.get("severity", 1.0)) >= 1.5 and c.time - h.get("_last", -1e9) >= 60.0:
+                h["_last"] = c.time
+                c.log("先読み (遊びの最中の警告): " + self._describe(h, tr, p, eta, dist), kind="predict_hazard",
+                      hazard=name, p=round(p, 2), dist=round(dist, 2))
+                spk = tr.get("room") if tr.get("room") in SPEAKERS else h.get("speaker")
+                if spk:
+                    c.speaker(spk, h["say"], intent="warn")
             return
         if a is None:
             if c.time - h.get("_last", -1e9) < 60.0:

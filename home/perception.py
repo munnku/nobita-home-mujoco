@@ -144,3 +144,46 @@ def estimate_person(cam, box, floor_z=0.0, margin=4):
     return {"x": round(x, 2), "y": round(y, 2), "posture": posture,
             "height": None if height is None else round(height, 2),
             "length": None if length is None else round(length, 2), "score": round(score, 2)}
+
+
+# ---- 床に落ちている小さい物 (アヒルの頭のカメラ、learning/make_dataset_hazard.py で学習)
+HAZARD_WEIGHTS = os.path.join(ROOT, "models", "yolo_hazard.pt")
+HAZARD_MIN_SCORE = 0.35
+
+
+class HazardDetector:
+    """床の小さい危ない物 (ボタン電池・硬貨・ビー玉・小さいブロック・ハサミ) を見つける。重みが無ければ使えない (None を返す)。"""
+
+    @classmethod
+    def load(cls, weights=None):
+        weights = weights or os.environ.get("HAZARD_WEIGHTS") or HAZARD_WEIGHTS
+        if not os.path.exists(weights):
+            print(f"[perception] 床の物の YOLO が無い ({weights})。見回りでは物を見つけられない", flush=True)
+            return None
+        return cls(weights)
+
+    def __init__(self, weights):
+        from ultralytics import YOLO
+        self.yolo = YOLO(weights)
+        print(f"[perception] 床の物の YOLO: {os.path.basename(weights)} classes={list(self.yolo.names.values())}",
+              flush=True)
+
+    def detect(self, images):
+        """絵ごとに [(x1, y1, x2, y2, score, 種類), ...]。"""
+        if not images:
+            return []
+        bgr = [np.ascontiguousarray(im[..., ::-1]) for im in images]
+        out = []
+        for r in self.yolo(bgr, verbose=False, conf=HAZARD_MIN_SCORE):
+            out.append([tuple(float(v) for v in b.xyxy[0]) + (float(b.conf), self.yolo.names[int(b.cls)])
+                        for b in r.boxes])
+        return out
+
+
+def estimate_object(cam, box, floor_z=0.0):
+    """床の物の枠から床の上の位置 {'x','y','kind','score'} (枠の真ん中の視線と床の交点。物は低いので床とみなす)。"""
+    x1, y1, x2, y2, score, kind = box[:6]
+    p = cam.floor_point((x1 + x2) / 2, (y1 + y2) / 2, floor_z)
+    if p is None:
+        return None
+    return {"kind": kind, "x": round(float(p[0]), 2), "y": round(float(p[1]), 2), "score": round(score, 2)}

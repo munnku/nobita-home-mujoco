@@ -101,7 +101,36 @@ def check_blind(want_level, want_kind):
     return check
 
 
-CHECKS = {"senmen_silent": check_blind("emergency", "blind_lying"), "toilet_long": check_blind(None, "blind_ok"),
+def check_hide(events):
+    """かくれんぼ: 見つけたか、何か所目か (でたらめな順なら平均 (候補の数 + 1) / 2 か所目)、転倒の誤報がないか。"""
+    logs = [e["payload"] for e in events if e["topic"] == "home/log" and isinstance(e["payload"], dict)]
+    found = next((p for p in logs if p.get("kind") == "hide_found"), None)
+    false_fall = [e for e in events if e["topic"] == "home/alerts" and e["payload"].get("type", "").startswith("fall")]
+    if found is None:
+        return False, "見つけられなかった"
+    n = found.get("n_spots", 0)
+    return not false_fall, (f"{found['time']}s に {found['spot']} で見つけた ({found['tries']} か所目 / 候補 {n}、"
+                            f"でたらめな順なら平均 {(n + 1) / 2:.1f} か所目) / 転倒の誤報 {len(false_fall)} 回")
+
+
+def check_patrol(events):
+    """見回り: 床に置いた物のうち、いくつ見つけたか (位置の誤差も)。"""
+    placed = [e["payload"] for e in events if e["topic"] == "sim/scenario" and "object" in e["payload"]]
+    found = [e["payload"] for e in events if e["topic"] == "home/log" and isinstance(e["payload"], dict)
+             and e["payload"].get("kind") == "hazard_found"]
+    hits, errs = 0, []
+    for o in placed:
+        f = next((f for f in found if f.get("hazard") == o["object"]), None)
+        if f:
+            hits += 1
+            errs.append(((f["x"] - o["x"]) ** 2 + (f["y"] - o["y"]) ** 2) ** 0.5)
+    wrong = len(found) - hits
+    err = f"位置の誤差 平均 {sum(errs) / len(errs):.2f} m" if errs else ""
+    return hits >= len(placed) - 1 and wrong == 0, f"置いた {len(placed)} 個のうち {hits} 個を見つけた / 誤り {wrong} 個 / {err}"
+
+
+CHECKS = {"hide_sofa": check_hide, "hide_table": check_hide, "hide_cupboard": check_hide, "hazard_patrol": check_patrol,
+          "senmen_silent": check_blind("emergency", "blind_lying"), "toilet_long": check_blind(None, "blind_ok"),
           "danger_stove": check_danger("stove"), "danger_genkan": check_danger("genkan"),
           "danger_bath": check_danger("bath"),
           "fall": check_fall, "morning": check_morning, "homecoming": check_homecoming,

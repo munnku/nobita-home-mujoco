@@ -21,9 +21,10 @@ import yaml  # noqa: E402
 
 from home.devices import HomeDevices  # noqa: E402
 from home.mqttc import Mqtt  # noqa: E402
-from home.perception import PersonDetector  # noqa: E402
+from home.perception import HazardDetector, PersonDetector  # noqa: E402
 from home.scenario import Scenario  # noqa: E402
 from home.vda5050 import Agent  # noqa: E402
+from objects import CLASSES as OBJECT_KINDS  # noqa: E402
 from world import DEFAULT_HOUSE, World  # noqa: E402
 
 
@@ -42,11 +43,12 @@ def main():
     mod = 0.91
     dock = home["robot"]["dock"]
     w = World(a.house, duck_pose=(dock["x"] * mod, dock["y"] * mod, math.radians(dock["yaw"])),
-              n_persons=len(home["people"]))
+              n_persons=len(home["people"]), objects={k: 2 for k in OBJECT_KINDS})
     det = PersonDetector()
+    hazard = HazardDetector.load()
     mq = Mqtt("sim-server", will=("sim/status", "offline"))
     devices = HomeDevices(w, mq, det, a.house)
-    agent = Agent(w, mq, det)
+    agent = Agent(w, mq, det, hazard)
     scen = Scenario(w, mq, a.house, a.scenario, devices)
     duration = a.duration or scen.duration
     rec = None
@@ -87,6 +89,7 @@ def main():
             mq.publish("home/time", round(w.time, 1))
             mq.publish("home/clock", scen.clock(), retain=True)
             mq.publish("sim/truth", {"time": round(w.time, 1), "persons": w.person_state,
+                                     "objects": {n: [round(v, 2) for v in xy] for n, xy in w.objects.on_floor().items()},
                                      "robot": dict(zip(("x", "y", "theta"), (round(v, 2) for v in w.duck.pose()))),
                                      "fallen": bool(w.duck.fallen())})
         if viewer is not None:

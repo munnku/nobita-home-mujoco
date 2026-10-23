@@ -26,6 +26,9 @@ places:
   senmen_fall: {x: 6.15, y: 6.6, yaw: 0, level: 1F}    # 脱衣所で倒れる (洗面台・洗濯機の手前。廊下のカメラから見えない)
   toilet_door: {x: 8.5, y: 5.4, yaw: 90, level: 1F}    # トイレの扉の前 (廊下)
   toilet_in: {x: 8.5, y: 6.7, yaw: -90, level: 1F}     # トイレの中
+  hide_sofa: {x: 9.4, y: 0.45, yaw: 0, level: 1F}      # かくれんぼ: 応接室のソファの南に伏せる
+  hide_table: {x: 2.27, y: 2.4, yaw: 90, level: 1F}    # かくれんぼ: DK の食卓の下にもぐる
+  hide_cupboard: {x: 3.15, y: 2.15, yaw: 0, level: 1F}  # かくれんぼ: DK の食器棚の西に立つ
 
 # 起こす (起床の見守り)
 wake_up:
@@ -68,3 +71,10 @@ blind_rooms:
   senmen: {door: senmen, stand: [6.55, 5.45], inside: [7.0, 6.5], max_stay: 40}
   toilet: {door: toilet, stand: [8.5, 5.45], inside: [8.5, 6.5], max_stay: 60}
   yokushitsu: {door: yokushitsu, stand: [6.5, 6.5], inside: [5.3, 6.45], max_stay: 40}
+# 見回り (床の小さい危ない物を探す)。points: 見る所 (マス)。every: おるすばん中にこの秒数ごとに見回る
+# sweep: 1 か所で回りながら見る秒数。at_start: おるすばんになったらすぐ見回る (home/patrol/request でも始まる)
+patrol:
+  every: 600
+  sweep: 11.0
+  at_start: false
+  points: [[5.3, 1.0], [7.9, 3.3], [9.3, 5.0], [6.0, 5.5], [3.3, 4.7], [1.3, 1.8], [10.6, 3.3]]

@@ -58,7 +58,7 @@ class BlindSpot(Rule):
         c = self.c
         heard = result_json(j.last[0] if j.last else None).get("heard") or []
         text = " ".join(h["text"] for h in heard if h.get("who"))
-        lab = classify_reply(text)[0]
+        lab = classify_reply(text)[0]       # 司令塔のスレッド (仕事の手順) から呼ぶので、読み込み中なら待つ
         j.replies.append({"text": text or None, "label": lab})
         c.log(f"返事: 「{text}」→ {lab}" if text else "返事がない", kind="reply", label=lab)
         room, label = j.room, LABEL.get(j.room, j.room)

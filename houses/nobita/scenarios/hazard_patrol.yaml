@@ -1,0 +1,13 @@
+# おるすばん中に、アヒルが家の中を見回り、床に落ちている小さい危ない物 (ボタン電池・ビー玉・硬貨) を見つけて知らせる
+name: hazard_patrol
+description: アヒルが見回って、床の小さい危ない物を見つける
+mode: alone
+duration: 240
+events:
+  - {t: 0, who: tamako, at: outside}
+  - {t: 0, who: nobita, at: ousetsu_sofa, pose: stand}
+  - {t: 2, mqtt: home/patrol/request, payload: {by: mama-app}}    # ママが外出先のアプリで見回りを頼む
+objects:
+  - {kind: button_battery, at: [5.7, 1.4]}       # 居間 (仏壇の前あたり)
+  - {kind: marble, at: [2.3, 1.6]}               # DK の食卓の南
+  - {kind: coin, at: [7.1, 5.5], yaw: 30}        # 廊下

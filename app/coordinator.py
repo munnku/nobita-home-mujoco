@@ -7,6 +7,8 @@
 - 玄関 (entrance.py): 扉が開いたら迎えに行き、閉め忘れた鍵は施錠する
 - 照明 (lights.py): だれもいない部屋の照明を消し、人が来たらつける
 - カメラの無い部屋 (blind_spot.py): 脱衣所・トイレに長くいれば、アヒルが扉の前で声をかけ、返事がなければ確かめる
+- 見回り (patrol.py): 床に落ちている小さい危ない物をアヒルの頭のカメラで探し、知らせる
+- かくれんぼ (hide_seek.py): 子どもに頼まれたらアヒルが鬼になり、隠れられそうな所を考えて探す
 - 先読み (predict.py): おるすばん中の子どもが危ない場所へ向かうのを先読みし、警告してアヒルが先回りする
 時刻はシミュレーションの時刻 (home/time) と家の時計 (home/clock) を使う。
 uv run python app/coordinator.py
@@ -25,7 +27,9 @@ from app.rules.base import M  # noqa: E402
 from app.rules.blind_spot import BlindSpot  # noqa: E402
 from app.rules.entrance import Entrance  # noqa: E402
 from app.rules.fall import Fall  # noqa: E402
+from app.rules.hide_seek import HideSeek  # noqa: E402
 from app.rules.lights import Lights  # noqa: E402
+from app.rules.patrol import Patrol  # noqa: E402
 from app.rules.predict import Predict  # noqa: E402
 from app.rules.requests import ROOM_SPOTS, Requests  # noqa: E402
 from app.rules.wake_up import WakeUp  # noqa: E402
@@ -53,6 +57,7 @@ class Coordinator:
         self.locked, self.door_open = {}, {}
         self.motion, self.light_on = {}, {}
         self.jobs, self.job = [], None
+        self.game = False            # かくれんぼの最中 (隠れて横になるのは転倒ではない。hide_seek.py)
         self.attended = {}           # 部屋 → アヒルが人の様子を確かめて知らせた時刻 (決まりごとどうしで重ねて知らせない)
         self.n = 0
         s = self.m.subscribe
@@ -67,7 +72,7 @@ class Coordinator:
         s("homie/+/light/on", lambda t, p: self.light_on.__setitem__(t.split("/")[1][6:], str(p).lower() == "true"))
         s(topic("state"), lambda t, p: self.robot.update(p))
         # 決まりごと (この順に毎回見る)
-        self.rules = [Requests(self), Fall(self), Predict(self), BlindSpot(self), WakeUp(self), Entrance(self), Lights(self)]
+        self.rules = [Requests(self), Fall(self), Predict(self), BlindSpot(self), Patrol(self), HideSeek(self), WakeUp(self), Entrance(self), Lights(self)]
 
     # ---- 共通
     def log(self, text, **kw):
@@ -96,6 +101,10 @@ class Coordinator:
         self.jobs.append(job)
         self.jobs.sort(key=lambda j: j.priority)
         self.log(f"仕事を受けた: {job.name}")
+        # 見回りのような後回しにできる仕事は、急ぐ仕事 (転倒・先読み) が来たらやめる (あとでまた見回る)
+        if self.job and getattr(self.job, "interruptible", False) and job.priority < self.job.priority:
+            self.log(f"{self.job.name} を中断して {job.name} を先にする", kind="preempt")
+            self.cancel_jobs(self.job.name)
 
     def room_spot(self, room):
         """アヒルがその部屋を見に行くときに立つ所 [m] (1 階の部屋だけ。行けない部屋は None)。"""

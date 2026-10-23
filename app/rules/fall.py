@@ -8,12 +8,13 @@
 import math
 import threading
 
-from home.judge import classify_reply, judge
+from home.judge import classify_reply, judge, start_loading
 from home.vda5050 import action
 
 from .base import LABEL, Job, Rule, result_json
 
 FALL_CONFIRM = 3.0     # 横になった人をこれだけ続けて見たら疑う [s]
+GAME_CONFIRM = 240.0   # かくれんぼの最中は、隠れて伏せていることがあるので長く待つ (痛がる声がすればすぐ)
 VOICE_CONFIRM = 1.0    # 痛がる声が聞こえた部屋なら、これだけ見れば疑う [s]
 VOICE_RECENT = 15.0    # 声をこの秒数のあいだ手がかりにする [s]
 SAME_PLACE = 1.5       # 同じ人とみなす距離 [m] (2 台のカメラの推定は 1 m ほどずれることがある)
@@ -29,14 +30,14 @@ class Fall(Rule):
         self.lying = []              # 転倒の候補 [{"x","y","room","first","last"}]
         self.handled = []
         self.distress = {}           # 部屋 → 痛がる声を聞いた時刻
-        c.m.subscribe("homie/+/audio/heard", self._on_heard)
+        self.voices = []             # 見守りカメラのマイクが聞いた声 (受信スレッドではためるだけ。step で見る)
+        c.m.subscribe("homie/+/audio/heard",
+                      lambda t, p: self.voices.append((t, p)) if isinstance(p, dict) and p.get("text") else None)
         # 返事を分けるモデルは読み込みに数秒かかるので、先に裏で読んでおく
-        threading.Thread(target=lambda: classify_reply("だいじょうぶ"), daemon=True).start()
+        start_loading()
 
     def _on_heard(self, t, voice):
-        if not isinstance(voice, dict) or not voice.get("text"):
-            return
-        lab, _, _ = classify_reply(voice["text"])
+        lab, _, _ = classify_reply(voice["text"], wait=False)
         if lab in ("hurt", "help"):
             room = voice.get("room") or self.c.cam_room.get(t.split("/")[1], "?")
             self.distress[room] = self.c.time
@@ -61,13 +62,15 @@ class Fall(Rule):
 
     def step(self):
         c = self.c
+        while self.voices:
+            self._on_heard(*self.voices.pop(0))
         self.lying = [cand for cand in self.lying if c.time - cand["last"] < 3.0]
         if c.busy("fall"):
             return
         for cand in self.lying:
             recent = any(math.hypot(h["x"] - cand["x"], h["y"] - cand["y"]) < SAME_PLACE and c.time - h["time"] < 600
                          for h in self.handled)
-            need = VOICE_CONFIRM if self._heard_in(cand["room"]) else FALL_CONFIRM
+            need = VOICE_CONFIRM if self._heard_in(cand["room"]) else (GAME_CONFIRM if c.game else FALL_CONFIRM)
             if cand["last"] - cand["first"] >= need and not recent:
                 self.handled.append({"x": cand["x"], "y": cand["y"], "time": c.time})
                 why = "横になった人と痛がる声" if need == VOICE_CONFIRM else "横になった人"

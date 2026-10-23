@@ -113,16 +113,40 @@ class ReplyClassifier:
         return lab, round(margin, 3), {k: round(v, 3) for k, v in sc.items()}
 
 
-_clf = None
+_clf = ReplyClassifier()
 _lock = threading.Lock()
+_ready = threading.Event()
 
 
-def classify_reply(text):
-    """(分類, 差, 点)。司令塔の MQTT の受信スレッドからも呼ぶので、1 つずつ行う。"""
-    global _clf
+def start_loading():
+    """埋め込みのモデルを裏で読み込み始める (数秒〜十数秒)。"""
+    def load():
+        try:
+            with _lock:
+                _clf._load()
+        except Exception:  # noqa: BLE001 (使えなければ手がかりだけで分ける)
+            _clf.model = False
+        _ready.set()
+    threading.Thread(target=load, daemon=True).start()
+
+
+def classify_reply(text, wait=True):
+    """(分類, 差, 点)。wait=False なら、モデルを読み込み中のときは言葉の手がかりだけで分ける (待たない)。"""
+    if not _ready.is_set() and not wait:
+        return _cues_only(text)
     with _lock:
-        _clf = _clf or ReplyClassifier()
         return _clf.classify(text)
+
+
+def _cues_only(text):
+    if not text or not text.strip():
+        return None, 0.0, {}
+    sc = {lab: 0.0 for lab in EXAMPLES}
+    for pat, lab, bonus in CUES:
+        if pat.search(text):
+            sc[lab] += bonus
+    lab = max(sc, key=sc.get)
+    return (lab if sc[lab] > 0 else "unclear"), 0.0, sc
 
 
 # ---- 重さの判断
@@ -186,15 +210,26 @@ PROMPT = """あなたは家庭の見守りシステムの判断役です。ひ�
 {{"level": "info|warn|emergency", "reason": "判断の理由 (日本語 1 文)", "message_to_parent": "保護者のスマホに送る文 (日本語 1〜2 文)"}}"""
 
 
-def _parse(text):
+def parse_json(text):
     m = re.search(r"\{.*\}", text, re.S)
-    out = json.loads(m.group(0)) if m else {}
+    if not m:
+        raise ValueError(f"no JSON in {text!r}")
+    return json.loads(m.group(0))
+
+
+def _parse(text):
+    out = parse_json(text)
     if out.get("level") not in LEVELS:
         raise ValueError(f"bad level in {text!r}")
     return out
 
 
-def _claude_code(prompt, timeout):
+def ask_llm(llm, prompt, timeout=90.0, parse=parse_json):
+    """llm: claude-code / api。答えの JSON を dict で返す (失敗は例外)。"""
+    return (_claude_code if llm == "claude-code" else _api)(prompt, timeout, parse)
+
+
+def _claude_code(prompt, timeout, parse=_parse):
     exe = shutil.which("claude") or shutil.which("claude.cmd")
     if not exe:
         raise RuntimeError("claude (Claude Code) が見つからない")
@@ -206,14 +241,14 @@ def _claude_code(prompt, timeout):
         raise RuntimeError(f"claude -p failed ({r.returncode}): {(r.stderr or r.stdout)[-300:]}") from None
     if out.get("is_error") or r.returncode != 0:
         raise RuntimeError(f"claude -p failed: {out.get('result', '')[:300]}")   # ログインが切れた、など
-    return _parse(out.get("result", ""))
+    return parse(out.get("result", ""))
 
 
-def _api(prompt, timeout):
+def _api(prompt, timeout, parse=_parse):
     import anthropic
     msg = anthropic.Anthropic(timeout=timeout).messages.create(
         model=API_MODEL, max_tokens=400, messages=[{"role": "user", "content": prompt}])
-    return _parse("".join(b.text for b in msg.content if b.type == "text"))
+    return parse("".join(b.text for b in msg.content if b.type == "text"))
 
 
 def judge(ev, llm=None, timeout=90.0):

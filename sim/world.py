@@ -6,6 +6,7 @@ IoT 機器やロボットの制御はこのクラスを通して世界を読み�
 - place_person: 人を置く・姿勢を変える (立つ / 横になる)
 - set_light: 部屋の照明
 - render(camera): カメラの絵 (RGB)
+- objects: 床に落ちている小さい物 (sim/objects.py)。objects={種類: 個数} で用意し、self.objects で置く・片付ける
 """
 import math
 import os
@@ -17,6 +18,7 @@ from duck import Duck
 from floormap import FloorMap
 from house import load as load_layout
 from navigator import Navigator
+from objects import Objects, add_objects
 from scene import compose, person_pose
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -31,7 +33,7 @@ MAX_RETRIES = 3       # 進まなくなったときに経路を作り直す回�
 
 class World:
     def __init__(self, house_dir=DEFAULT_HOUSE, duck_pose=(0.0, 0.0, 0.0), n_persons=2,
-                 policy=None):
+                 policy=None, objects=None):
         # 既定は、この家で強化学習した歩き方 (models/nobita_walk.onnx) があればそれ、なければ公開の velstand
         default = "nobita_walk" if os.path.exists(os.path.join(ROOT, "models", "nobita_walk.onnx")) else "velstand"
         policy = policy or os.environ.get("DUCK_POLICY", default)
@@ -40,8 +42,10 @@ class World:
         self.layout = load_layout(house_dir)
         self.module = self.layout["module"]
         spec, self.door_open_q = compose(house_dir, duck=True, n_persons=n_persons)
+        obj_names = add_objects(spec, objects) if objects else []
         self.duck = Duck(spec, policy=policy)
         self.model, self.data = self.duck.model, self.duck.data
+        self.objects = Objects(self.model, self.data, obj_names) if obj_names else None
         m = self.model
         self.n_persons = n_persons
         self.person_state = {}

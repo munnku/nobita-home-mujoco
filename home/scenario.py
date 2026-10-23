@@ -11,6 +11,8 @@ mode: alone ならおるすばんモード (home/mode を retain で出す。司
 警告への反応 (react): {人: {on: warn, ignore: 無視する回数, delay: 止まるまでの秒数, near: アヒルがこれより近づけば止まる}}。
   止まると、その人の unless_stopped: true のイベント (止められなければ行うこと) は行わない。
 危ない場所 (home.yaml の hazards) に人が入ったら sim/scenario に hazard_entered を出す (評価用)。
+床の小さい物 (objects): [{kind: button_battery, at: [x, y] (マス)}] を始めに床に置く (sim/objects.py)。
+{t, mqtt: トピック, payload: 値} はその時刻に MQTT に出す (家の人がアプリで頼んだこと。例: 見回りの依頼)。
 """
 import math
 import os
@@ -45,6 +47,7 @@ class Scenario:
         self.stop_at = {}         # 人 → 止まる時刻
         self.in_hazard = {}
         mqtt.publish("home/mode", self.sc.get("mode", "family"), retain=True)
+        self._place_objects()
 
     def tick(self):
         mod = self.w.module
@@ -54,6 +57,10 @@ class Scenario:
             self.k += 1
             if "door" in e:
                 self._door(e)
+                continue
+            if "mqtt" in e:
+                self.m.publish(e["mqtt"], e.get("payload", {}))
+                print(f"[scenario] t={self.w.time:.1f} MQTT {e['mqtt']}", flush=True)
                 continue
             i = self.index[e["who"]]
             if e.get("unless_stopped") and i in self.stopped:
@@ -97,6 +104,19 @@ class Scenario:
         self.voices.tick()
         self._near_robot()
         self._hazards()
+
+    def _place_objects(self):
+        objs = self.w.objects
+        used = {}
+        for o in self.sc.get("objects") or []:
+            k = used.get(o["kind"], 0)
+            used[o["kind"]] = k + 1
+            name = f"obj_{o['kind']}_{k}"
+            x, y = (v * self.w.module for v in o["at"])
+            objs.place(name, x, y, math.radians(o.get("yaw", 0.0)))
+            self.m.publish("sim/scenario", {"time": 0.0, "object": o["kind"], "x": round(x, 2), "y": round(y, 2),
+                                            "room": self.w.room_of(x, y)})
+            print(f"[scenario] {o['kind']} を床に置く ({x:.2f}, {y:.2f})", flush=True)
 
     # ---- 警告への反応
     def _on_intent(self, i, intent):

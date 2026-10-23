@@ -9,6 +9,8 @@
 - instantActions: cancelOrder, startPause, stopPause, stateRequest, factsheetRequest、
   speak / listen / detectObject (いまの場所で行う。blockingType=NONE の speak は移動を止めずにすぐ話す)
 - detectObject で人を見つけたら、その絵を build/alerts/ に残し、結果に image として書く (privacy=true なら残さない)
+- detectObject の objectType=hazard は、首を下に向けてその場で 1 周しながら、床の小さい物を探す (見回り)。
+  結果は objects [{kind, x, y, score, room}]
 - state: 1 秒ごとと変化したとき。agvPosition, driving, nodeStates, edgeStates, actionStates, errors など
 アヒルが自分で経路を作る (地図の上の A*) ので、ノードは「行き先」だけでよい。
 """
@@ -20,12 +22,14 @@ import queue
 
 import numpy as np
 
-from .perception import CameraModel, estimate_person
+from .perception import CameraModel, estimate_object, estimate_person
 
 VERSION = "2.0.0"
 MANUFACTURER = "NobitaHome"
 SERIAL = "microduck-01"
 MAP_ID = "nobita-1F"
+HAZARD_NECK = -0.8    # 床の物を探すときの首の角度 (下向き) [rad]
+SAME_OBJECT = 0.2     # 同じ物とみなす距離 [m]
 HEAR_RADIUS = 4.0     # アヒルのマイクに声が届く距離 [m] (同じ部屋ならこれより遠くても届く)
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ALERT_DIR = os.path.join(ROOT, "build", "alerts")
@@ -68,10 +72,11 @@ def action(action_type, action_id, **kw):
 class Agent:
     """ロボット側。シミュレーションのスレッドから tick() を毎回呼ぶ (MQTT の受信はキューで受け渡す)。"""
 
-    def __init__(self, world, mqtt, detector):
+    def __init__(self, world, mqtt, detector, hazard_detector=None):
         self.w = world
         self.m = mqtt
         self.det = detector
+        self.hazard = hazard_detector
         self.inbox = queue.Queue()
         self.header = 0
         self.order = None
@@ -99,6 +104,8 @@ class Agent:
         if self.driving:
             return "移動中"
         if self.action_run is not None:
+            if self.action_run.get("p", {}).get("objectType") == "hazard":
+                return "床を見回っている"
             return {"detectObject": "人を確かめている", "speak": "話している", "listen": "聞いている",
                     "wait": "待っている"}.get(
                 self.action_run.get("type"), "作業中")
@@ -121,7 +128,8 @@ class Agent:
                                    "width": 0.16, "length": 0.12},
             "protocolLimits": {}, "protocolFeatures": {"optionalParameters": [], "agvActions": [
                 {"actionType": "detectObject", "actionScopes": ["NODE", "INSTANT"],
-                 "actionParameters": [{"key": "objectType", "valueDataType": "STRING"},
+                 "actionParameters": [{"key": "objectType", "valueDataType": "STRING",
+                                       "description": "person (人) / hazard (床の小さい危ない物)"},
                                       {"key": "targetX", "valueDataType": "FLOAT", "isOptional": True},
                                       {"key": "targetY", "valueDataType": "FLOAT", "isOptional": True},
                                       {"key": "duration", "valueDataType": "FLOAT", "isOptional": True},
@@ -231,7 +239,10 @@ class Agent:
                     for na in n.get("actions", []):
                         self._set_action_state(na, "FAILED", "canceled")
             self.order = None
+            self.node_idx = self.action_idx = 0     # このあとの即時のアクションが新しい order の始めから動くように
+            self.action_run = None
             self.w.stop()
+            self.w.duck.set_head()
             self.driving = False
             self._set_action_state(a, "FINISHED")
         elif t == "startPause":
@@ -255,8 +266,9 @@ class Agent:
             self._set_action_state(a, "FINISHED")
         elif t in ("speak", "detectObject", "listen"):
             # 即時のアクションとしても受け付ける (いまの場所で行う)
-            self.order = self.order or {"orderId": f"instant-{a['actionId']}", "orderUpdateId": 0,
-                                        "nodes": [], "edges": []}
+            if self.order is None:
+                self.order = {"orderId": f"instant-{a['actionId']}", "orderUpdateId": 0, "nodes": [], "edges": []}
+                self.node_idx = self.action_idx = 0
             x, y, _ = self.w.duck.pose()
             self.order["nodes"].append({"nodeId": f"here-{a['actionId']}", "sequenceId": 10000 + self.header,
                                         "nodePosition": {"x": x, "y": y, "allowedDeviationXY": 10.0},
@@ -368,6 +380,8 @@ class Agent:
             return el >= dur, True, ""
         if t == "listen":
             return self._step_listen(run, el)
+        if t == "detectObject" and run["p"].get("objectType") == "hazard":
+            return self._step_hazard(run, el)
         if t == "detectObject":
             return self._step_detect(run, el)
         return True, False, f"unknown action {t}"
@@ -418,6 +432,51 @@ class Agent:
             cv2.rectangle(vis, (b[0], b[1]), (b[2], b[3]), (40, 40, 230), 3)
         cv2.imwrite(path, vis)
         return os.path.relpath(path, ROOT).replace("\\", "/")
+
+    def _step_hazard(self, run, el):
+        """床の小さい物を探す: 首を下に向けて 1 秒待ち、ゆっくり 1 周回りながら 0.5 秒ごとに見る。"""
+        if self.hazard is None:
+            return True, False, json.dumps({"found": False, "objects": [], "error": "no hazard detector"})
+        objs = run.setdefault("objects", [])
+        self.w.duck.set_head(neck_pitch=HAZARD_NECK)
+        if el < 1.0:
+            self.w.set_manual_cmd(0.0, 0.0, 0.0)
+            return False, False, ""
+        self.w.set_manual_cmd(0.0, 0.0, 0.55)
+        if self.w.time >= run.get("next_look", 0.0):
+            run["next_look"] = self.w.time + 0.5
+            img = self.w.render("head_camera", 640, 480)
+            cam = CameraModel.from_mujoco(self.w.model, self.w.data, "head_camera", 640, 480)
+            for b in self.hazard.detect([img])[0]:
+                est = estimate_object(cam, b, 0.0)
+                if est is None:
+                    continue
+                same = next((o for o in objs if o["kind"] == est["kind"]
+                             and math.hypot(o["x"] - est["x"], o["y"] - est["y"]) < SAME_OBJECT), None)
+                if same is None:
+                    objs.append({**est, "room": self.w.room_of(est["x"], est["y"]), "n": 1})
+                    run.setdefault("shots", []).append((img, [int(v) for v in b[:4]]))
+                else:
+                    same["n"] += 1
+                    same["score"] = max(same["score"], est["score"])
+        if el >= float(run["p"].get("duration", 11.0)):
+            self.w.set_manual_cmd(0.0, 0.0, 0.0)
+            self.w.duck.set_head()
+            found = [{k: v for k, v in o.items() if k != "n"} for o in objs]
+            img = None
+            if run.get("shots") and str(run["p"].get("privacy", "")).lower() not in ("true", "1"):
+                import cv2
+                os.makedirs(ALERT_DIR, exist_ok=True)
+                im, box = run["shots"][0]
+                vis = np.ascontiguousarray(im[..., ::-1])
+                cv2.rectangle(vis, (box[0] - 4, box[1] - 4), (box[2] + 4, box[3] + 4), (40, 40, 230), 2)
+                path = os.path.join(ALERT_DIR, f"{run['id']}_{self.w.time:.0f}.jpg")
+                cv2.imwrite(path, vis)
+                img = os.path.relpath(path, ROOT).replace("\\", "/")
+            for o in found:
+                o["image"] = img
+            return True, True, json.dumps({"found": bool(found), "objects": found}, ensure_ascii=False)
+        return False, False, ""
 
     def _step_detect(self, run, el):
         """人を探す: target があればそちらを向き、見えなければ左右に首 (体) を振る。最も確かな検出を返す。"""
