@@ -107,14 +107,22 @@ class Env:
         return st, true, est, est_yaw, dict(reach=reach, fwd=fwd, yaw=oyaw, mu=mu)
 
 
-def trial(env, rng, assist, t_max=45.0, hold=2.0):
+def trial(env, rng, assist, t_max=45.0, hold=2.0, policy=None):
+    """policy: 学習した補正 (learning/rl_pick/residual.py の MLPPolicy)。None なら計算で決めた拾い方だけ。"""
     st, true, est, est_yaw, info = env.reset(rng, assist)
     m, d = env.m, env.d
     z0 = true[2]
     t0 = d.time
     status = "running"
+    rp = None
+    if policy is not None:
+        from rl_pick.residual import ResidualPick
+        rp = ResidualPick(st, policy)
     while status == "running" and d.time - t0 < t_max:
-        status = st.pick_step(est, yaw=est_yaw, width=grip_width(env.kind))
+        if rp is None:
+            status = st.pick_step(est, yaw=est_yaw, width=grip_width(env.kind))
+        else:
+            status = rp.step(est, est_yaw, grip_width(env.kind), env.kind)
         for _ in range(CTRL_EVERY):
             mujoco.mj_step(m, d)
     t_pick = d.time - t0
@@ -142,17 +150,21 @@ def apply_overrides(overrides):
 
 def run_one(job):
     """(物の種類, 物理の設定, 補助, 回数, seed, 上書き, verbose) → 集計。並列に動かせるよう 1 つで完結させる。"""
-    kind, opt, assist, n, seed, overrides, verbose, ctrl_every = job
+    kind, opt, assist, n, seed, overrides, verbose, ctrl_every, policy_path = job
     warnings.filterwarnings("ignore")
     apply_overrides(overrides)
     global CTRL_EVERY
     CTRL_EVERY = ctrl_every
     env = Env(kind, opt)
+    policy = None
+    if policy_path:
+        from rl_pick.residual import MLPPolicy
+        policy = MLPPolicy(policy_path)
     rng = np.random.default_rng(seed)
     res = []
     t = time.time()
     for i in range(n):
-        r = trial(env, rng, assist)
+        r = trial(env, rng, assist, policy=policy)
         res.append(r)
         if verbose:
             print(f"  {kind} #{i:3d} {'OK ' if r['ok'] else 'NG '} {r['reason']:24s} reach {r['reach']:.2f} fwd {r['fwd']:+.2f} "
@@ -165,22 +177,23 @@ def run_one(job):
             fails[r["reason"]] = fails.get(r["reason"], 0) + 1
     t_ok = [r["t"] for r in res if r["ok"]]
     row = dict(ok=ok, n=n, fails=fails, t=float(np.mean(t_ok)) if t_ok else float("nan"))
-    print(f"{kind:15s} opt={opt:8s} assist={'on ' if assist else 'off'} {ok:3d}/{n}  ({time.time() - t:.0f} s)  {fails}",
-          flush=True)
-    return kind, opt, assist, row
+    print(f"{kind:15s} opt={opt:8s} assist={'on ' if assist else 'off'} {'rl ' if policy_path else 'calc'} {ok:3d}/{n}  "
+          f"({time.time() - t:.0f} s)  {fails}", flush=True)
+    return kind, opt, assist, policy_path, row
 
 
-def column(opt, assist):
-    return f"{OPT_LABEL[opt]}・weld 補助{'あり' if assist else 'なし'}"
+def column(opt, assist, policy_path=None):
+    return f"{OPT_LABEL[opt]}・weld 補助{'あり' if assist else 'なし'}" + ("・学習した補正" if policy_path else "")
 
 
 OPT_LABEL = {"house": "家の既定", "noslip": "noslip 3", "stretch": "Stretch の option", "elliptic": "elliptic"}
 
 
-def write_md(results, n, seed, overrides, ctrl_every=CTRL_EVERY):
+def write_md(results, n, seed, overrides, ctrl_every=CTRL_EVERY, out=OUT,
+             title="Stretch 3 で床の小さい物を拾う — 決め打ちの拾い方の成功率", extra=()):
     cols = list(results)
     kinds = list(next(iter(results.values())))
-    lines = ["# Stretch 3 で床の小さい物を拾う — 決め打ちの拾い方の成功率", "",
+    lines = [f"# {title}", "", *extra,
              f"`learning/eval_pick.py` で作成 (種類ごとに {n} 回、seed {seed}、timestep {TIMESTEP}、"
              f"制御の周期 {ctrl_every * TIMESTEP:.3f} s)。"
              " 考察と注意は [pick_notes.md](pick_notes.md)。", "",
@@ -211,10 +224,10 @@ def write_md(results, n, seed, overrides, ctrl_every=CTRL_EVERY):
             t = f"{r['t']:.1f} s" if r["ok"] else "—"
             lines.append(f"  - {label(k)}: 平均 {t}、失敗: {fails}")
     lines.append("")
-    os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    with open(OUT, "w", encoding="utf-8") as f:
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    with open(out, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
-    print("wrote", OUT)
+    print("wrote", out)
 
 
 def main():
@@ -227,12 +240,18 @@ def main():
     ap.add_argument("--set", action="append", default=[], help="sim/stretch.py の定数を上書き NAME=VALUE")
     ap.add_argument("--jobs", type=int, default=1, help="並列のプロセス数")
     ap.add_argument("--ctrl-every", type=int, default=CTRL_EVERY, help="pick_step を何ステップごとに呼ぶか (4 = 0.02 s、家と同じ)")
+    ap.add_argument("--controller", choices=["calc", "rl", "both"], default="calc",
+                    help="calc = 計算で決めた拾い方、rl = それに学習した補正を足したもの (learning/rl_pick)")
+    ap.add_argument("--policy", default=os.path.join(ROOT, "learning", "rl_pick", "policy.npz"))
+    ap.add_argument("--out", default=OUT, help="書き出す表 (.md。同じ名前の .json も)")
     ap.add_argument("--no-write", action="store_true")
     ap.add_argument("-v", "--verbose", action="store_true")
     a = ap.parse_args()
     apply_overrides(a.set)
     modes = {"off": [False], "on": [True], "both": [False, True]}[a.assist]
-    jobs = [(k, o, m, a.n, a.seed, a.set, a.verbose, a.ctrl_every) for o in a.opt for m in modes for k in a.kinds]
+    pols = {"calc": [None], "rl": [a.policy], "both": [None, a.policy]}[a.controller]
+    jobs = [(k, o, m, a.n, a.seed, a.set, a.verbose, a.ctrl_every, p)
+            for o in a.opt for m in modes for p in pols for k in a.kinds]
     if a.jobs > 1:
         from multiprocessing import Pool
         with Pool(a.jobs) as pool:
@@ -242,12 +261,20 @@ def main():
     results = {}
     for o in a.opt:
         for m in modes:
-            results[column(o, m)] = {k: row for k, oo, mm, row in out if oo == o and mm == m}
+            for p in pols:
+                results[column(o, m, p)] = {k: row for k, oo, mm, pp, row in out if oo == o and mm == m and pp == p}
     if not a.no_write:
-        with open(OUT.replace(".md", ".json"), "w", encoding="utf-8") as f:
-            json.dump(dict(n=a.n, seed=a.seed, overrides=a.set, ctrl_every=a.ctrl_every, results=results), f,
-                      ensure_ascii=False, indent=1)
-        write_md(results, a.n, a.seed, a.set, a.ctrl_every)
+        with open(a.out.replace(".md", ".json"), "w", encoding="utf-8") as f:
+            json.dump(dict(n=a.n, seed=a.seed, overrides=a.set, ctrl_every=a.ctrl_every, controller=a.controller,
+                           policy=os.path.relpath(a.policy, ROOT) if a.controller != "calc" else None, results=results),
+                      f, ensure_ascii=False, indent=1)
+        extra = ()
+        if a.controller != "calc":
+            extra = (f"学習した補正: `{os.path.relpath(a.policy, ROOT)}` (learning/rl_pick、詳しくは "
+                     "[pick_rl.md](pick_rl.md))。", "")
+        write_md(results, a.n, a.seed, a.set, a.ctrl_every, out=a.out,
+                 title="Stretch 3 で床の小さい物を拾う — " + ("計算で決めた拾い方と学習した補正の比較" if a.controller != "calc"
+                                                         else "決め打ちの拾い方の成功率"), extra=extra)
 
 
 if __name__ == "__main__":
