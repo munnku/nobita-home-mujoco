@@ -31,7 +31,10 @@ Gazebo 版 (別リポジトリ `PAI1 Final`) は参考にするだけで、新�
   学習曲線と混同行列は `docs/learning/hazard_results.png` / `hazard_confusion.png`。
 - Stretch 3 の拾い方: 計算で決めた動き (腕を物の真上へ → 床まで下げる → 床に押しつけながら閉じる) の成功率を
   `learning/eval_pick.py` で測った (`docs/learning/pick_eval.md`)。小さい物は指から滑るので、閉じたら weld でつなぐ補助を入れた
-  (補助ありで 84〜100%、なしで 0〜92%)。つかみ方の強化学習はしていない。
+  (補助ありで 84〜100%、なしで 0〜92%)。
+- Stretch 3 の拾い方の強化学習 (10/24): 計算で決めた動きの、閉じ始めてからの補正を PPO で学習した (CPU の MuJoCo、評価と同じ
+  noslip 3。mjlab の MuJoCo Warp は noslip に対応していなかった)。補助なしで 500 回中 299 → 295 回、硬貨は 55 → 42% で、
+  上回らなかったので使っていない。数 g の物を柔らかい接触で挟む物理の限界が主な原因。`docs/learning/pick_rl.md`。
 - 歩き方の強化学習 R1 (散らかった床・敷物・座布団・押し): 2 回学習したが、家の中では元の nobita_walk より強くならなかった。
   nobita_walk と起き上がりの切り替えの組み合わせが一番良い (散らかった居間で 12 本中 8 本到着、押されても 12/12)。
   詳しくは `docs/learning/robust_summary.md`。
