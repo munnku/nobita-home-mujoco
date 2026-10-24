@@ -66,6 +66,32 @@ def main():
     fig.tight_layout()
     fig.savefig(OUT, dpi=120)
     print("wrote", OUT)
+    plot_per_kind()
+
+
+def plot_per_kind():
+    """種類ごとの方策 (build/rl_pick/kind_<種類>_log.json): 学習に使わない場面 300 個での、乱数なしの成功率。"""
+    fig, ax = plt.subplots(figsize=(6.5, 4.2))
+    found = False
+    for k, c in zip(KINDS, plt.rcParams["axes.prop_cycle"].by_key()["color"]):
+        path = os.path.join(ROOT, "build", "rl_pick", f"kind_{k}_log.json")
+        if not os.path.exists(path):
+            continue
+        found = True
+        ev = [r for r in json.load(open(path, encoding="utf-8")) if "det_success" in r]
+        steps = np.array([r["steps"] for r in ev]) / 1e6
+        ax.plot(steps, [r["det_success"] for r in ev], color=c, label=k)
+        ax.axhline(ev[0]["det_success"], color=c, ls=":", lw=1)
+    if not found:
+        return
+    ax.set(xlabel="steps [M]", ylabel="success rate", ylim=(0, 1))
+    ax.set_title("per-kind policies: held-out 300 states each, no noise (dotted = scripted)", fontsize=9)
+    ax.legend(fontsize=8)
+    ax.grid(alpha=0.3)
+    fig.tight_layout()
+    out = OUT.replace(".png", "_kind.png")
+    fig.savefig(out, dpi=120)
+    print("wrote", out)
 
 
 if __name__ == "__main__":

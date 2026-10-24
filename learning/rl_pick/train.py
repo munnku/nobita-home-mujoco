@@ -24,17 +24,19 @@ OUT_DIR = os.path.join(ROOT, "build", "rl_pick")
 HIDDEN = 128
 
 
-def worker(conn, pool_path, seed, eval_path=None):
+def load_pool(path, kinds=None):
+    with open(path, "rb") as f:
+        pool = pickle.load(f)
+    return [e for e in pool if not kinds or e["kind"] in kinds]
+
+
+def worker(conn, pool_path, seed, eval_path=None, kinds=None):
     import warnings
     warnings.filterwarnings("ignore")
     from rl_pick.env import PickEnv
     from rl_pick.residual import MLPPolicy
-    with open(pool_path, "rb") as f:
-        pool = pickle.load(f)
-    eval_pool = []
-    if eval_path:
-        with open(eval_path, "rb") as f:
-            eval_pool = pickle.load(f)
+    pool = load_pool(pool_path, kinds)
+    eval_pool = load_pool(eval_path, kinds) if eval_path else []
     env = PickEnv(pool, seed)
     rng = np.random.default_rng(seed + 12345)
     obs = env.reset()
@@ -107,6 +109,7 @@ def main():
     ap.add_argument("--eval-pool", default=os.path.join(OUT_DIR, "pool_s2.pkl"),
                     help="学習に使わない場面。乱数なしの方策の成功率で一番良いものを残す")
     ap.add_argument("--eval-every", type=int, default=25)
+    ap.add_argument("--kinds", nargs="*", default=None, help="この種類の場面だけで学習する (種類ごとの方策)")
     ap.add_argument("--log", default=os.path.join(OUT_DIR, "train_log.json"))
     ap.add_argument("--out", default=os.path.join(HERE, "policy.npz"))
     a = ap.parse_args()
@@ -136,13 +139,12 @@ def main():
     conns, procs = [], []
     for i in range(a.workers):
         c1, c2 = Pipe()
-        pr = Process(target=worker, args=(c2, a.pool, a.seed * 1000 + i, a.eval_pool), daemon=True)
+        pr = Process(target=worker, args=(c2, a.pool, a.seed * 1000 + i, a.eval_pool, a.kinds), daemon=True)
         pr.start()
         conns.append(c1)
         procs.append(pr)
 
-    with open(a.eval_pool, "rb") as f:
-        n_eval = len(pickle.load(f))
+    n_eval = len(load_pool(a.eval_pool, a.kinds))
 
     def det_eval(p):
         for i, c in enumerate(conns):

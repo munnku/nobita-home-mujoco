@@ -158,8 +158,8 @@ def run_one(job):
     env = Env(kind, opt)
     policy = None
     if policy_path:
-        from rl_pick.residual import MLPPolicy
-        policy = MLPPolicy(policy_path)
+        from rl_pick.residual import load_policy
+        policy = load_policy(policy_path)       # .npz 1 つか、種類ごとの policy_<種類>.npz のフォルダ
     rng = np.random.default_rng(seed)
     res = []
     t = time.time()

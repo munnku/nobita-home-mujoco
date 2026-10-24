@@ -10,6 +10,7 @@
 行動がすべて 0 なら、今の拾い方と同じ動きになる。方策は numpy だけで動く (learning/rl_pick/policy_*.npz)。
 """
 import math
+import os
 
 import numpy as np
 
@@ -36,6 +37,19 @@ class MLPPolicy:
         x = np.tanh(x @ p["w0"] + p["b0"])
         x = np.tanh(x @ p["w1"] + p["b1"])
         return x @ p["w2"] + p["b2"]
+
+
+def load_policy(path, kinds=None):
+    """policy.npz 1 つ (全種類で共通)、または policy_<種類>.npz の入ったフォルダ (種類ごと、dict を返す)。
+
+    kinds: フォルダのとき、補正を使う種類 (それ以外は今の拾い方のまま)。
+        補助なしで良くなったのはビー玉とブロックだけ (docs/learning/pick_rl.md) なので、使うなら
+        load_policy("learning/rl_pick/per_kind", kinds=("marble", "toy_block"))。
+    """
+    if os.path.isdir(path):
+        return {k: MLPPolicy(os.path.join(path, f"policy_{k}.npz")) for k in KIND_LIST
+                if os.path.exists(os.path.join(path, f"policy_{k}.npz")) and (kinds is None or k in kinds)}
+    return MLPPolicy(path)
 
 
 class ResidualPick:
@@ -94,7 +108,8 @@ class ResidualPick:
                 self.begin(target, kind, width)
             return r
         if action is None:
-            action = self.policy(self.observe()) if self.policy is not None else np.zeros(N_ACT)
+            pol = self.policy.get(self.kind) if isinstance(self.policy, dict) else self.policy
+            action = pol(self.observe()) if pol is not None else np.zeros(N_ACT)   # 方策の無い種類は今の拾い方のまま
         a = np.clip(np.asarray(action, float), -1.0, 1.0)
         # 計算で決めた拾い方の出力 (前のステップの補正を外したもの) に戻してから 1 ステップ進める
         d.ctrl[self.idx] = self.base_ctrl
