@@ -65,7 +65,6 @@ class Story(Scenario):
         self.logs = queue.Queue()
         mqtt.subscribe("home/log", lambda t, p: self.logs.put(p) if isinstance(p, dict) else None)
         self.end_t = None
-        self.on_chapter = None       # 章が始まったときに呼ぶ (録画の題)
 
     # ---- 毎ステップ
     def tick(self):
@@ -143,8 +142,6 @@ class Story(Scenario):
         title = cfg.get("title")
         self.m.publish("sim/scenario", {"time": round(now, 1), "chapter": n, "title": title})
         print(f"[story] t={now:.1f} 章 {n} を始める: {title or '(題なし)'}", flush=True)
-        if title and self.on_chapter:
-            self.on_chapter(title)
 
     def _stand_up(self, who):
         """{t, who, stand_up: true}: まだ横になっていれば、その場で起き上がる (アヒルが見つけられず問いかけが来なかったとき、

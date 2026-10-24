@@ -65,8 +65,6 @@ def main():
     if a.record:
         from app.recorder import Recorder
         rec = Recorder(w, a.record, fps=15)
-        if a.story:
-            scen.on_chapter = rec.chapter
         def on_log(t, p):
             if isinstance(p, dict):
                 rec.log(p.get("text", ""))

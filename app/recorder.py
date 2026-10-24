@@ -1,4 +1,5 @@
 """動画に残す: 見下ろし (1 階) + アヒルの後ろから + 頭のカメラ + 状況の文字 を 1 枚にして MP4 に書く。"""
+import math
 import os
 import sys
 
@@ -35,15 +36,9 @@ class Recorder:
         self.top.distance, self.top.azimuth, self.top.elevation = 12.4, 90, -89   # 東西が全部入る距離
         self.font = jp_font(20)
         self.font_small = jp_font(16)
-        self.font_title = jp_font(44)
-        self.title, self.title_until = "", 0.0    # 物語の章の題 (始まってからしばらくは大きく出す)
         self.lines = []            # 状況の文 (新しいものが下)
         self.head_boxes = []
         self.focus_room, self.focus_until = None, 0.0
-
-    def chapter(self, title, seconds=5.0):
-        """物語の章が始まった: 題を見下ろしの絵の真ん中に大きく出し、そのあとは左下に小さく残す。"""
-        self.title, self.title_until = title, self.w.time + seconds
 
     def focus(self, room, seconds=25.0):
         """しばらくその部屋の見守りカメラを出す (司令塔が部屋のことを知らせたとき)。"""
@@ -69,7 +64,16 @@ class Recorder:
         room = self.w.room_of(x, y)
         show = self.focus_room if self.w.time < self.focus_until else room
         cam_name = self._room_camera(devices, show) or self._room_camera(devices, room)
-        if cam_name:
+        st = self.w.stretch
+        if st is not None and st.phase is not None:
+            # Stretch が腕で拾う・置く間は、上から小さくしか見えないので後ろから近くで映す
+            cam_name = None
+            sx, sy, syaw = st.pose()
+            cam = mujoco.MjvCamera()
+            cam.lookat[:] = [sx, sy, 0.3]
+            cam.distance, cam.azimuth, cam.elevation = 2.0, math.degrees(syaw), -55
+            frame[:270, 800:] = self.w.render(cam, 480, 270)
+        elif cam_name:
             # アヒルがいる部屋の見守りカメラ (YOLO の枠と推定した姿勢を重ねる)
             src = devices.latest_images.get(cam_name)
             panel = cv2.resize(src, (480, 270)) if src is not None else np.zeros((270, 480, 3), np.uint8)
@@ -86,15 +90,9 @@ class Recorder:
         d.rectangle([800, 540, 1280, 720], fill=(25, 25, 30))
         status = agent.status_text() if agent else ""
         d.text((10, 8), f"t = {self.w.time:5.1f} s   アヒル: {room or '-'}  {status}", font=self.font, fill=(0, 0, 0))
-        if self.title:
-            d.text((10, 690), self.title, font=self.font, fill=(0, 0, 0))
-            if self.w.time < self.title_until:
-                tw = d.textlength(self.title, font=self.font_title)
-                d.rectangle([400 - tw / 2 - 24, 300, 400 + tw / 2 + 24, 380], fill=(255, 255, 255),
-                            outline=(40, 40, 40), width=3)
-                d.text((400 - tw / 2, 312), self.title, font=self.font_title, fill=(20, 20, 20))
-        d.text((808, 4), f"見守りカメラ ({cam_name})" if cam_name else "アヒルの上から", font=self.font_small,
-               fill=(255, 255, 255))
+        label = (f"見守りカメラ ({cam_name})" if cam_name else
+                 "片付け係 (Stretch 3)" if st is not None and st.phase is not None else "アヒルの上から")
+        d.text((808, 4), label, font=self.font_small, fill=(255, 255, 255))
         d.text((808, 274), "頭のカメラ", font=self.font_small, fill=(255, 255, 255))
         if agent and agent.speech:
             d.rectangle([810, 500, 1270, 536], fill=(255, 255, 220))
