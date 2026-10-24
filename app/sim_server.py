@@ -23,6 +23,7 @@ from home.devices import HomeDevices  # noqa: E402
 from home.mqttc import Mqtt  # noqa: E402
 from home.perception import HazardDetector, PersonDetector  # noqa: E402
 from home.scenario import Scenario  # noqa: E402
+from home.story import Story  # noqa: E402
 from home.vda5050 import Agent, StretchAgent  # noqa: E402
 from objects import CLASSES as OBJECT_KINDS  # noqa: E402
 from world import DEFAULT_HOUSE, World  # noqa: E402
@@ -32,6 +33,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--house", default=DEFAULT_HOUSE)
     ap.add_argument("--scenario", default="fall")
+    ap.add_argument("--story", default=None, help="一続きの物語 (houses/<家>/stories/<名前>.yaml)。指定すると --scenario は使わない")
     ap.add_argument("--speed", type=float, default=1.0)
     ap.add_argument("--viewer", action="store_true")
     ap.add_argument("--record", default=None)
@@ -42,7 +44,9 @@ def main():
         home = yaml.safe_load(f)
     mod = 0.91
     dock = home["robot"]["dock"]
-    with open(os.path.join(a.house, "scenarios", f"{a.scenario}.yaml"), encoding="utf-8") as f:
+    path = (os.path.join(a.house, "stories", f"{a.story}.yaml") if a.story
+            else os.path.join(a.house, "scenarios", f"{a.scenario}.yaml"))
+    with open(path, encoding="utf-8") as f:
         sc = yaml.safe_load(f)
     st = home["stretch"]["dock"] if sc.get("stretch") else None      # 片付け係の Stretch 3 は使う場面だけ置く (重い)
     w = World(a.house, duck_pose=(dock["x"] * mod, dock["y"] * mod, math.radians(dock["yaw"])),
@@ -54,12 +58,15 @@ def main():
     devices = HomeDevices(w, mq, det, a.house)
     agent = Agent(w, mq, det, hazard)
     st_agent = StretchAgent(w, mq) if w.stretch else None
-    scen = Scenario(w, mq, a.house, a.scenario, devices)
+    scen = Story(w, mq, a.house, a.story, devices) if a.story else Scenario(w, mq, a.house, a.scenario, devices)
     duration = a.duration or scen.duration
+    finished = getattr(scen, "finished", lambda: False)      # 物語は終わりの条件がそろえば上限より前に終わる
     rec = None
     if a.record:
         from app.recorder import Recorder
-        rec = Recorder(w, a.record)
+        rec = Recorder(w, a.record, fps=15)
+        if a.story:
+            scen.on_chapter = rec.chapter
         def on_log(t, p):
             if isinstance(p, dict):
                 rec.log(p.get("text", ""))
@@ -79,10 +86,11 @@ def main():
     control = {}
     mq.subscribe("sim/control", lambda t, p: control.update(cmd=p))      # "stop" で止める (録画を閉じてから終わる)
     mq.publish("sim/status", "running", retain=True)
-    print(f"[sim] scenario={a.scenario} duration={duration}s speed={a.speed}", flush=True)
+    print(f"[sim] {'story=' + a.story if a.story else 'scenario=' + a.scenario} duration={duration}s speed={a.speed}",
+          flush=True)
     t_wall0 = time.time()
     next_pub = 0.0
-    while w.time < duration and control.get("cmd") != "stop":
+    while w.time < duration and not finished() and control.get("cmd") != "stop":
         scen.tick()
         devices.tick()
         agent.tick()
@@ -100,6 +108,8 @@ def main():
                                      "robot": dict(zip(("x", "y", "theta"), (round(v, 2) for v in w.duck.pose()))),
                                      "fallen": bool(w.duck.fallen()), "recovering": bool(w.duck.recovering),
                                      "duck_z": round(float(w.data.qpos[w.duck.qa + 2]), 3),
+                                     "duck_cmd": [round(float(v), 2) for v in w.duck.command[:3]],
+                                     "nav": w.nav_status(),
                                      "stretch": (dict(zip(("x", "y", "theta"), (round(v, 2) for v in w.stretch.pose())))
                                                  if w.stretch else None)})
         if viewer is not None:

@@ -28,6 +28,7 @@ def port_open(port=1883):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--scenario", default="fall")
+    ap.add_argument("--story", default=None, help="一続きの物語 (houses/nobita/stories/<名前>.yaml)")
     ap.add_argument("--speed", type=float, default=0.0)
     ap.add_argument("--record", default=None)
     ap.add_argument("--viewer", action="store_true")
@@ -49,7 +50,8 @@ def main():
     def on_truth(t, p):
         truth.update(p)
         track.append({"time": p.get("time"), "robot": p.get("robot"), "fallen": p.get("fallen"),
-                      "recovering": p.get("recovering"), "duck_z": p.get("duck_z"), "stretch": p.get("stretch")})
+                      "recovering": p.get("recovering"), "duck_z": p.get("duck_z"), "duck_cmd": p.get("duck_cmd"),
+                      "nav": p.get("nav"), "stretch": p.get("stretch")})
     m.subscribe("sim/truth", on_truth)
     status = {}
     m.subscribe("sim/status", lambda t, p: status.update(s=p))
@@ -57,7 +59,8 @@ def main():
     coord = subprocess.Popen([PY, os.path.join(ROOT, "app", "coordinator.py")])
     procs.append(coord)
     time.sleep(1.0)
-    cmd = [PY, os.path.join(ROOT, "app", "sim_server.py"), "--scenario", a.scenario, "--speed", str(a.speed)]
+    cmd = [PY, os.path.join(ROOT, "app", "sim_server.py"), "--speed", str(a.speed)]
+    cmd += ["--story", a.story] if a.story else ["--scenario", a.scenario]
     if a.record:
         cmd += ["--record", a.record]
     if a.viewer:
@@ -72,9 +75,10 @@ def main():
     out_dir = os.path.join(ROOT, "build", "runs")
     os.makedirs(out_dir, exist_ok=True)
     stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    path = os.path.join(out_dir, f"{a.scenario}_{stamp}.json")
+    name = a.story or a.scenario
+    path = os.path.join(out_dir, f"{name}_{stamp}.json")
     with open(path, "w", encoding="utf-8") as f:
-        json.dump({"scenario": a.scenario, "events": events, "final_truth": truth, "robot_track": track}, f, ensure_ascii=False, indent=1)
+        json.dump({"scenario": name, "events": events, "final_truth": truth, "robot_track": track}, f, ensure_ascii=False, indent=1)
     print("==== 結果 ====")
     for e in events:
         p = e["payload"]
@@ -87,6 +91,8 @@ def main():
         elif e["topic"] == "home/speech":
             who = "アヒル" if p.get("speaker") == "microduck-01" else p.get("speaker")
             print(f"  {p.get('time', 0):6.1f}s  [{who}] {p.get('text')}")
+        elif e["topic"] == "sim/scenario" and "chapter" in p:
+            print(f"  {p.get('time', 0):6.1f}s  ==== 章 {p['chapter']}: {p.get('title') or ''}")
         elif e["topic"] == "sim/scenario" and "door" in p:
             print(f"  {p.get('time', 0):6.1f}s  [人役] 扉 {p.get('door')}: {p.get('do')}")
         elif e["topic"] == "sim/scenario":

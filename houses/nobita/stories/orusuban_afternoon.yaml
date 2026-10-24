@@ -1,0 +1,114 @@
+# おるすばんの午後: のび太が学校から帰ってきてから、ひとりで留守番する間の出来事を一続きにした物語 (動画用)。
+# 章は前の出来事 (司令塔のログの kind、または前の章が済んだこと) のあとに始まる。書き方は home/story.py。
+# ママは出かけている (家にだれもいない away から始まり、アヒルがのび太を迎えると司令塔がおるすばんモードにする)。
+name: orusuban_afternoon
+description: 帰宅 → 転ぶ → コンロ → トイレ → 見回りと片付け → かくれんぼ
+mode: away
+stretch: true
+start_clock: "15:00:00"
+duration: 2400
+events:
+  - {t: 0, who: tamako, at: outside}
+  - {t: 0, who: nobita, at: outside}
+  - {t: 0.5, mqtt: home/patrol/config, payload: {every: 0}}   # 見回りは章 7 でママのアプリから頼むときだけ
+
+chapters:
+  - title: "1. ただいま"
+    start_after: {at: 0}
+    events:
+      - {t: 10, door: genkan, do: unlock}           # のび太が自分の鍵で開ける
+      - {t: 12, door: genkan, do: open}
+      - {t: 13, who: nobita, at: genkan_in, pose: stand}
+      - {t: 13.5, who: nobita, say: "ただいまー！"}
+      - {t: 19, door: genkan, do: close}            # 鍵は閉め忘れる (20 秒後に自動で施錠)
+    replies:
+      nobita:
+        greet: {say: "ただいま、アヒル！", delay: 1.0}
+        default: null
+
+  - title: "2. 居間へ"
+    start_after: {kind: greet, delay: 8}            # アヒルが先に居間へ戻り始めてから
+    max_wait: 120
+    events:
+      - {t: 0, who: nobita, at: ima_center, pose: stand, walk: true, speed: 0.5}
+
+  - title: "3. 居間で転ぶ"
+    start_after: {done: true, delay: 6}
+    events:
+      - {t: 0, who: nobita, at: ima_fall, pose: stand, walk: true, speed: 0.6}
+      - {t: 5, who: nobita, at: ima_fall, pose: lie}
+      - {t: 5.5, who: nobita, say: "いたっ！"}
+      - {t: 70, who: nobita, stand_up: true}         # アヒルが来なくても、そのうち自分で起き上がる (横になっていれば)
+    replies:
+      nobita:
+        ask_ok: {say: "いてて…ころんじゃった。でもへーきだよ", delay: 2.0, then: {pose: stand}}
+        ask_ok_again: {say: "うん、へーき", delay: 1.5, then: {pose: stand}}
+        ask_pain: {say: "ううん、どこもいたくない", delay: 1.5}
+        default: null
+
+  - title: "4. コンロに近づく"
+    start_after: {kind: fall_judged, delay: 8}
+    max_wait: 120
+    events:
+      - {t: 0, who: nobita, say: "おなかすいた。なにか作ろうかな"}
+      - {t: 2, who: nobita, at: dk_stove, pose: stand, walk: true, speed: 0.6}
+    react:
+      nobita: {on: warn, ignore: 0, delay: 1.0}     # 警告が聞こえたら 1 秒で止まる
+    replies:
+      nobita:
+        warn: [{say: "はーい、ごめんなさい", delay: 1.0}, null]
+        default: null
+
+  - title: "5. トイレ"
+    start_after: {kind: child_stopped, delay: 6}
+    max_wait: 90
+    events:
+      - {t: 0, who: nobita, at: toilet_door, pose: stand, walk: true, speed: 0.6}
+    react: {}
+
+  - start_after: {done: true, delay: 1}             # トイレに入る (題なし)
+    events:
+      - {t: 0, door: toilet, do: open}
+      - {t: 1, who: nobita, at: toilet_in, pose: stand}
+      - {t: 2, door: toilet, do: close}
+    replies:
+      nobita:
+        ask_ok: {say: "いまトイレー！もうすぐでるよ", delay: 1.5}
+        default: null
+
+  - title: "6. トイレから応接室へ"
+    start_after: {kind: blind_ok, delay: 15}       # アヒルが扉の前を離れてから
+    max_wait: 200
+    events:
+      - {t: 0, door: toilet, do: open}
+      - {t: 1, who: nobita, at: toilet_door, pose: stand}
+      - {t: 2, door: toilet, do: close}
+      # 応接室のソファで本を読む (居間の真ん中にいると、Stretch が居間の南の物へ行く道をふさぐ)
+      - {t: 3, who: nobita, at: ousetsu_sofa, pose: stand, walk: true, speed: 0.6}
+
+  - title: "7. 見回りと片付け"
+    start_after: {done: true, delay: 5}
+    events:
+      # のび太が遊んで散らかした想定。のび太とロボットの通り道から外した所に置く
+      - {t: 0, objects: [{kind: button_battery, at: [6.4, 0.6]}, {kind: marble, at: [2.3, 1.6]},
+                         {kind: coin, at: [7.1, 5.5], yaw: 30}]}
+      - {t: 2, who: nobita, say: "あーあ、おもちゃちらかしちゃった"}
+      - {t: 4, mqtt: home/patrol/request, payload: {by: mama-app}}   # ママが外出先のアプリで見回りを頼む
+    replies:
+      nobita:
+        warn: {say: "はーい", delay: 1.0}
+        default: null
+
+  - title: "8. かくれんぼ"
+    start_after: {kind: tidy_finished, delay: 8}
+    max_wait: 900
+    events:
+      - {t: 0, who: nobita, say: "ねえアヒル、かくれんぼしよう！アヒルが鬼ね！"}
+      - {t: 3, who: nobita, at: hide_cupboard, pose: stand, walk: true, speed: 1.0}   # 応接室から DK まで約 10 m
+    replies:
+      nobita:
+        hide_ready: {say: "もういいよー！", delay: 1.0}
+        hide_found: {say: "あーあ、みつかっちゃった！", delay: 1.0, then: {pose: stand}}
+        default: null
+
+end_after: {kind: hide_found, delay: 15}

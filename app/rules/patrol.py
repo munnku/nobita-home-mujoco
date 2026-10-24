@@ -33,6 +33,8 @@ class Patrol(Rule):
         self.found = []           # [{"kind", "x", "y", "room", "time", "score", "state": found/picked}]
         self.requests = []
         c.m.subscribe("home/patrol/request", lambda t, p: self.requests.append(p))
+        # 設定を変える (例: {every: 0} で決まった間隔の見回りをやめ、頼まれたときだけ見回る)
+        c.m.subscribe("home/patrol/config", lambda t, p: self.cfg.update(p) if isinstance(p, dict) else None)
         # 片付け係 (Stretch 3)
         self.st_state = {}
         self.has_stretch = False
@@ -48,7 +50,8 @@ class Patrol(Rule):
             return
         self._step_tidy()
         want = bool(self.requests)
-        if c.mode == "alone" and c.time - self.last >= self.cfg.get("every", 300):
+        every = self.cfg.get("every", 300)
+        if c.mode == "alone" and every and c.time - self.last >= every:
             want = want or (c.job is None and not c.jobs)
         if want and not c.busy("patrol"):
             self.requests.clear()
@@ -200,6 +203,9 @@ class Patrol(Rule):
         if any(f["state"] == "found" for f in self.found):
             self.tidy = None
         else:
+            done = sum(1 for f in self.found if f["state"] == "picked")
+            self.c.log(f"片付けが終わった (箱に入れた物: {done} 個) → Stretch は待機場所へ戻る", kind="tidy_finished",
+                       count=done)
             self._send(obj, "home")
 
     def _at_feet(self, o):

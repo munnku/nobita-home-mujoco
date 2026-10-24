@@ -1,0 +1,578 @@
+{
+ "A: 公開 YOLOv8s + 幾何の姿勢判定": {
+  "weights": "third_party/yolov8s.pt",
+  "who": false,
+  "stats": {
+   "iot/lying/all": {
+    "n": 338,
+    "found": 141,
+    "posture_ok": 126,
+    "who_ok": 0
+   },
+   "iot/lying/child": {
+    "n": 120,
+    "found": 28,
+    "posture_ok": 27,
+    "who_ok": 0
+   },
+   "all/all/child": {
+    "n": 352,
+    "found": 204,
+    "posture_ok": 144,
+    "who_ok": 0
+   },
+   "all/all/all": {
+    "n": 888,
+    "found": 580,
+    "posture_ok": 455,
+    "who_ok": 0
+   },
+   "iot/lying/stranger": {
+    "n": 125,
+    "found": 59,
+    "posture_ok": 52,
+    "who_ok": 0
+   },
+   "all/all/stranger": {
+    "n": 269,
+    "found": 176,
+    "posture_ok": 154,
+    "who_ok": 0
+   },
+   "head/lying/all": {
+    "n": 103,
+    "found": 43,
+    "posture_ok": 43,
+    "who_ok": 0
+   },
+   "head/lying/child": {
+    "n": 63,
+    "found": 27,
+    "posture_ok": 27,
+    "who_ok": 0
+   },
+   "iot/standing/all": {
+    "n": 315,
+    "found": 279,
+    "posture_ok": 239,
+    "who_ok": 0
+   },
+   "iot/standing/stranger": {
+    "n": 99,
+    "found": 89,
+    "posture_ok": 86,
+    "who_ok": 0
+   },
+   "iot/standing/child": {
+    "n": 103,
+    "found": 88,
+    "posture_ok": 61,
+    "who_ok": 0
+   },
+   "head/standing/all": {
+    "n": 132,
+    "found": 117,
+    "posture_ok": 47,
+    "who_ok": 0
+   },
+   "head/standing/child": {
+    "n": 66,
+    "found": 61,
+    "posture_ok": 29,
+    "who_ok": 0
+   },
+   "iot/standing/adult": {
+    "n": 113,
+    "found": 102,
+    "posture_ok": 92,
+    "who_ok": 0
+   },
+   "all/all/adult": {
+    "n": 267,
+    "found": 200,
+    "posture_ok": 157,
+    "who_ok": 0
+   },
+   "iot/lying/adult": {
+    "n": 93,
+    "found": 54,
+    "posture_ok": 47,
+    "who_ok": 0
+   },
+   "head/lying/stranger": {
+    "n": 21,
+    "found": 8,
+    "posture_ok": 8,
+    "who_ok": 0
+   },
+   "head/standing/stranger": {
+    "n": 24,
+    "found": 20,
+    "posture_ok": 8,
+    "who_ok": 0
+   },
+   "head/standing/adult": {
+    "n": 42,
+    "found": 36,
+    "posture_ok": 10,
+    "who_ok": 0
+   },
+   "head/lying/adult": {
+    "n": 19,
+    "found": 8,
+    "posture_ok": 8,
+    "who_ok": 0
+   }
+  },
+  "false_positives": {
+   "iot": 12,
+   "head": 10
+  },
+  "confusion": {
+   "all": [
+    [
+     0,
+     0,
+     0,
+     148
+    ],
+    [
+     0,
+     0,
+     0,
+     67
+    ],
+    [
+     0,
+     0,
+     0,
+     93
+    ]
+   ],
+   "iot": [
+    [
+     0,
+     0,
+     0,
+     107
+    ],
+    [
+     0,
+     0,
+     0,
+     50
+    ],
+    [
+     0,
+     0,
+     0,
+     76
+    ]
+   ],
+   "head": [
+    [
+     0,
+     0,
+     0,
+     41
+    ],
+    [
+     0,
+     0,
+     0,
+     17
+    ],
+    [
+     0,
+     0,
+     0,
+     17
+    ]
+   ]
+  }
+ },
+ "B: 追加学習 2 クラス (yolo_nobita)": {
+  "weights": "models/yolo_nobita.pt",
+  "who": false,
+  "stats": {
+   "iot/lying/all": {
+    "n": 338,
+    "found": 314,
+    "posture_ok": 312,
+    "who_ok": 0
+   },
+   "iot/lying/child": {
+    "n": 120,
+    "found": 107,
+    "posture_ok": 106,
+    "who_ok": 0
+   },
+   "all/all/child": {
+    "n": 352,
+    "found": 302,
+    "posture_ok": 271,
+    "who_ok": 0
+   },
+   "all/all/all": {
+    "n": 888,
+    "found": 799,
+    "posture_ok": 757,
+    "who_ok": 0
+   },
+   "iot/lying/stranger": {
+    "n": 125,
+    "found": 116,
+    "posture_ok": 116,
+    "who_ok": 0
+   },
+   "all/all/stranger": {
+    "n": 269,
+    "found": 253,
+    "posture_ok": 243,
+    "who_ok": 0
+   },
+   "head/lying/all": {
+    "n": 103,
+    "found": 86,
+    "posture_ok": 86,
+    "who_ok": 0
+   },
+   "head/lying/child": {
+    "n": 63,
+    "found": 53,
+    "posture_ok": 53,
+    "who_ok": 0
+   },
+   "iot/standing/all": {
+    "n": 315,
+    "found": 275,
+    "posture_ok": 235,
+    "who_ok": 0
+   },
+   "iot/standing/stranger": {
+    "n": 99,
+    "found": 98,
+    "posture_ok": 88,
+    "who_ok": 0
+   },
+   "iot/standing/child": {
+    "n": 103,
+    "found": 77,
+    "posture_ok": 47,
+    "who_ok": 0
+   },
+   "head/standing/all": {
+    "n": 132,
+    "found": 124,
+    "posture_ok": 124,
+    "who_ok": 0
+   },
+   "head/standing/child": {
+    "n": 66,
+    "found": 65,
+    "posture_ok": 65,
+    "who_ok": 0
+   },
+   "iot/standing/adult": {
+    "n": 113,
+    "found": 100,
+    "posture_ok": 100,
+    "who_ok": 0
+   },
+   "all/all/adult": {
+    "n": 267,
+    "found": 244,
+    "posture_ok": 243,
+    "who_ok": 0
+   },
+   "iot/lying/adult": {
+    "n": 93,
+    "found": 91,
+    "posture_ok": 90,
+    "who_ok": 0
+   },
+   "head/lying/stranger": {
+    "n": 21,
+    "found": 17,
+    "posture_ok": 17,
+    "who_ok": 0
+   },
+   "head/standing/stranger": {
+    "n": 24,
+    "found": 22,
+    "posture_ok": 22,
+    "who_ok": 0
+   },
+   "head/standing/adult": {
+    "n": 42,
+    "found": 37,
+    "posture_ok": 37,
+    "who_ok": 0
+   },
+   "head/lying/adult": {
+    "n": 19,
+    "found": 16,
+    "posture_ok": 16,
+    "who_ok": 0
+   }
+  },
+  "false_positives": {
+   "iot": 99,
+   "head": 77
+  },
+  "confusion": {
+   "all": [
+    [
+     0,
+     0,
+     0,
+     50
+    ],
+    [
+     0,
+     0,
+     0,
+     23
+    ],
+    [
+     0,
+     0,
+     0,
+     16
+    ]
+   ],
+   "iot": [
+    [
+     0,
+     0,
+     0,
+     39
+    ],
+    [
+     0,
+     0,
+     0,
+     15
+    ],
+    [
+     0,
+     0,
+     0,
+     10
+    ]
+   ],
+   "head": [
+    [
+     0,
+     0,
+     0,
+     11
+    ],
+    [
+     0,
+     0,
+     0,
+     8
+    ],
+    [
+     0,
+     0,
+     0,
+     6
+    ]
+   ]
+  }
+ },
+ "C: 追加学習 6 クラス (yolo_nobita_who)": {
+  "weights": "models/yolo_nobita_who.pt",
+  "who": true,
+  "stats": {
+   "iot/lying/all": {
+    "n": 338,
+    "found": 333,
+    "posture_ok": 330,
+    "who_ok": 330
+   },
+   "iot/lying/child": {
+    "n": 120,
+    "found": 117,
+    "posture_ok": 114,
+    "who_ok": 116
+   },
+   "all/all/child": {
+    "n": 352,
+    "found": 345,
+    "posture_ok": 342,
+    "who_ok": 344
+   },
+   "all/all/all": {
+    "n": 888,
+    "found": 867,
+    "posture_ok": 863,
+    "who_ok": 863
+   },
+   "iot/lying/stranger": {
+    "n": 125,
+    "found": 125,
+    "posture_ok": 125,
+    "who_ok": 124
+   },
+   "all/all/stranger": {
+    "n": 269,
+    "found": 268,
+    "posture_ok": 267,
+    "who_ok": 266
+   },
+   "head/lying/all": {
+    "n": 103,
+    "found": 97,
+    "posture_ok": 97,
+    "who_ok": 96
+   },
+   "head/lying/child": {
+    "n": 63,
+    "found": 61,
+    "posture_ok": 61,
+    "who_ok": 61
+   },
+   "iot/standing/all": {
+    "n": 315,
+    "found": 307,
+    "posture_ok": 307,
+    "who_ok": 307
+   },
+   "iot/standing/stranger": {
+    "n": 99,
+    "found": 99,
+    "posture_ok": 99,
+    "who_ok": 99
+   },
+   "iot/standing/child": {
+    "n": 103,
+    "found": 101,
+    "posture_ok": 101,
+    "who_ok": 101
+   },
+   "head/standing/all": {
+    "n": 132,
+    "found": 130,
+    "posture_ok": 129,
+    "who_ok": 130
+   },
+   "head/standing/child": {
+    "n": 66,
+    "found": 66,
+    "posture_ok": 66,
+    "who_ok": 66
+   },
+   "iot/standing/adult": {
+    "n": 113,
+    "found": 107,
+    "posture_ok": 107,
+    "who_ok": 107
+   },
+   "all/all/adult": {
+    "n": 267,
+    "found": 254,
+    "posture_ok": 254,
+    "who_ok": 253
+   },
+   "iot/lying/adult": {
+    "n": 93,
+    "found": 91,
+    "posture_ok": 91,
+    "who_ok": 90
+   },
+   "head/lying/stranger": {
+    "n": 21,
+    "found": 20,
+    "posture_ok": 20,
+    "who_ok": 19
+   },
+   "head/standing/stranger": {
+    "n": 24,
+    "found": 24,
+    "posture_ok": 23,
+    "who_ok": 24
+   },
+   "head/standing/adult": {
+    "n": 42,
+    "found": 40,
+    "posture_ok": 40,
+    "who_ok": 40
+   },
+   "head/lying/adult": {
+    "n": 19,
+    "found": 16,
+    "posture_ok": 16,
+    "who_ok": 16
+   }
+  },
+  "false_positives": {
+   "iot": 19,
+   "head": 15
+  },
+  "confusion": {
+   "all": [
+    [
+     344,
+     1,
+     0,
+     7
+    ],
+    [
+     0,
+     253,
+     1,
+     13
+    ],
+    [
+     0,
+     2,
+     266,
+     1
+    ]
+   ],
+   "iot": [
+    [
+     217,
+     1,
+     0,
+     5
+    ],
+    [
+     0,
+     197,
+     1,
+     8
+    ],
+    [
+     0,
+     1,
+     223,
+     0
+    ]
+   ],
+   "head": [
+    [
+     127,
+     0,
+     0,
+     2
+    ],
+    [
+     0,
+     56,
+     0,
+     5
+    ],
+    [
+     0,
+     1,
+     43,
+     1
+    ]
+   ]
+  }
+ }
+}

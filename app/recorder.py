@@ -31,13 +31,19 @@ class Recorder:
         os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
         self.vw = cv2.VideoWriter(path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (self.W, self.H))
         self.top = mujoco.MjvCamera()
-        self.top.lookat[:] = [5.5, 3.5, 0]
-        self.top.distance, self.top.azimuth, self.top.elevation = 10.5, 90, -89
+        self.top.lookat[:] = [5.46, 3.64, 0]        # 1 階 (東西 10.9 m・南北 7.3 m) の真ん中
+        self.top.distance, self.top.azimuth, self.top.elevation = 12.4, 90, -89   # 東西が全部入る距離
         self.font = jp_font(20)
         self.font_small = jp_font(16)
+        self.font_title = jp_font(44)
+        self.title, self.title_until = "", 0.0    # 物語の章の題 (始まってからしばらくは大きく出す)
         self.lines = []            # 状況の文 (新しいものが下)
         self.head_boxes = []
         self.focus_room, self.focus_until = None, 0.0
+
+    def chapter(self, title, seconds=5.0):
+        """物語の章が始まった: 題を見下ろしの絵の真ん中に大きく出し、そのあとは左下に小さく残す。"""
+        self.title, self.title_until = title, self.w.time + seconds
 
     def focus(self, room, seconds=25.0):
         """しばらくその部屋の見守りカメラを出す (司令塔が部屋のことを知らせたとき)。"""
@@ -56,7 +62,7 @@ class Recorder:
     def tick(self, devices=None, agent=None):
         if self.w.time < self.next_t:
             return
-        self.next_t = self.w.time + self.period
+        self.next_t += self.period      # (時刻 + 間隔 にすると 0.02 s 刻みに丸められ、動画が実時間の 1.2 倍速になった)
         frame = np.zeros((self.H, self.W, 3), np.uint8)
         frame[:, :800] = self.w.render(self.top, 800, 720, groups=(0, 1, 2))
         x, y, _ = self.w.duck.pose()
@@ -80,6 +86,13 @@ class Recorder:
         d.rectangle([800, 540, 1280, 720], fill=(25, 25, 30))
         status = agent.status_text() if agent else ""
         d.text((10, 8), f"t = {self.w.time:5.1f} s   アヒル: {room or '-'}  {status}", font=self.font, fill=(0, 0, 0))
+        if self.title:
+            d.text((10, 690), self.title, font=self.font, fill=(0, 0, 0))
+            if self.w.time < self.title_until:
+                tw = d.textlength(self.title, font=self.font_title)
+                d.rectangle([400 - tw / 2 - 24, 300, 400 + tw / 2 + 24, 380], fill=(255, 255, 255),
+                            outline=(40, 40, 40), width=3)
+                d.text((400 - tw / 2, 312), self.title, font=self.font_title, fill=(20, 20, 20))
         d.text((808, 4), f"見守りカメラ ({cam_name})" if cam_name else "アヒルの上から", font=self.font_small,
                fill=(255, 255, 255))
         d.text((808, 274), "頭のカメラ", font=self.font_small, fill=(255, 255, 255))

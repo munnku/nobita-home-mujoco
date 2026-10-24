@@ -19,7 +19,7 @@ from .homie import HomieDevice
 from .perception import CameraModel, covered, estimate_person, robot_box
 
 DUCK_NEAR = 0.6       # 見守りカメラの「横になった人」がアヒルからこれより近ければ、アヒル自身とみなす [m]
-STRETCH_NEAR = 0.9    # 同じく Stretch から (腕を伸ばすと台車の中心から 0.7 m ほど出る) [m]
+STRETCH_NEAR = 1.3    # 同じく Stretch から (腕を伸ばすと台車の中心から 0.7 m ほど出て、推定はさらに 0.3〜0.5 m ずれる) [m]
 
 
 def _dev_id(prefix, name):
@@ -47,7 +47,8 @@ class HomeDevices:
         for c in self.cam_cfg["cameras"]:
             self.cams[c["name"]] = HomieDevice(mqtt, _dev_id("cam", c["room"]), f"見守りカメラ ({rooms[c['room']]['label']})", {
                 "camera": {"name": "人の検出", "type": "camera", "properties": {
-                    "persons": {"name": "見つけた人 (位置 m・姿勢)", "datatype": "string", "format": "json"},
+                    "persons": {"name": "見つけた人 (位置 m・姿勢・だれか who: child / adult / stranger)",
+                                "datatype": "string", "format": "json"},
                     "count": {"name": "人数", "datatype": "integer"},
                     "room": {"name": "部屋", "datatype": "string"},
                 }},

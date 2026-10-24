@@ -237,7 +237,14 @@ class Agent:
             self.errors = [{"errorType": "orderError", "errorLevel": "WARNING",
                             "errorDescription": "busy: 前の order が終わっていない"}]
             self.next_state_t = 0.0
+            if os.environ.get("AGENT_DEBUG"):
+                print(f"[agent] t={self.w.time:.1f} {self.serial} order {o.get('orderId')} を断った (busy: "
+                      f"{self.order['orderId']} のノード {self.node_idx}/{len(self.order['nodes'])})", flush=True)
             return
+        if os.environ.get("AGENT_DEBUG"):
+            last = o["nodes"][-1].get("nodePosition", {})
+            print(f"[agent] t={self.w.time:.1f} {self.serial} order {o.get('orderId')} を受けた → "
+                  f"({last.get('x', 0):.2f}, {last.get('y', 0):.2f}) 許容 {last.get('allowedDeviationXY')}", flush=True)
         self.errors = []
         self.order = o
         self.node_idx = 0
@@ -303,6 +310,9 @@ class Agent:
             dev = pos.get("allowedDeviationXY", 0.1) if pos else 0.0
             if pos is None or (not self._needs_nav(node) and math.hypot(pos["x"] - x, pos["y"] - y) <= max(dev, 0.12)):
                 node["_reached"] = True
+                if os.environ.get("AGENT_DEBUG"):
+                    print(f"[agent] t={self.w.time:.1f} {self.serial} {o['orderId']} {node['nodeId']} に着いた (距離) "
+                          f"いま ({x:.2f}, {y:.2f}) navigating={o.get('_navigating')}", flush=True)
                 if o.get("_navigating"):
                     self._stop()        # 許される距離に入った: 経路の残りを歩き続けないよう止める (止めないと首を下げたまま歩いた)
             elif not o.get("_navigating"):
@@ -352,8 +362,10 @@ class Agent:
         self.w.stop()
 
     def _needs_nav(self, node):
-        """近くにいても、ノードの位置へ動き直す必要があるか (Stretch の pick は腕の下に物が来る所へ行く)。"""
-        return False
+        """近くにいても、ノードの位置へ動き直す必要があるか (Stretch の pick は腕の下に物が来る所へ行く)。
+        アヒルは人を見に行くノード (detectObject に target がある) なら、人を見通せる立ち位置まで行く。
+        ノードへの距離が許される範囲に入っただけで止まると、家具 (ちゃぶ台) の陰で止まって人を見られなかった。"""
+        return self._look_target(node) is not None
 
     def _nav_status(self):
         return self.w.nav_status()
@@ -570,8 +582,8 @@ class Agent:
         off = (math.atan2(d[1], d[0]) - math.atan2(ty - y, tx - x) + math.pi) % (2 * math.pi) - math.pi
         if abs(off) > TARGET_BEARING:
             return None
-        return {"x": tx, "y": ty, "posture": b[5], "height": None, "length": None, "score": round(float(b[4]), 2),
-                "occluded": True}
+        return {"x": tx, "y": ty, "posture": b[5], "who": b[6] if len(b) > 6 else None, "height": None, "length": None,
+                "score": round(float(b[4]), 2), "occluded": True}
 
     def _step_detect(self, run, el):
         """人を探す: target があればそちらを向き、見えなければ左右に首 (体) を振る。最も確かな検出を返す。"""

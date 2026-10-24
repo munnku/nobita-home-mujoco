@@ -36,7 +36,8 @@ BETA = 4.0             # 距離が 1 m 縮むごとに足す証拠の大きさ
 FORGET = 0.85          # 1 秒ごとに古い証拠に掛ける値 (0.5 秒ごとに更新するので、その平方根を掛ける)
 STEP = 0.5             # 行き先を推定する間隔 [s]
 TRACK_GATE = 1.0       # 同じ人とみなす距離 [m]
-STOP_GUARD = 0.9       # アヒルが立つ所: 危ない場所からこの距離の、子どもの経路の上 [m]
+ARRIVED = 0.3          # ふつうの行き先にこれより近ければ、そこに着いたとみなす [m]
+STOP_GUARD = 0.9      # アヒルが立つ所: 危ない場所からこの距離の、子どもの経路の上 [m]
 REPEAT_WARN = 6.0      # 歩きながら声をかける間隔 [s]
 SPEAKERS = ("nobita", "dk", "ima", "rouka")
 
@@ -147,8 +148,11 @@ class Predict(Rule):
                     best.update(x=p["x"], y=p["y"], t=c.time)
                 best["room"] = p.get("room") or room
             else:
+                # 危ない場所の中で見つかり始めた人 (帰ってきて玄関の土間にいる子ども) は、一度そこから出るまで
+                # その場所について警告しない (外から入ってきただけで「外に出ないで」と言わないように)
+                inside = {n for n in self.hazards if self.df.dist(n, p["x"], p["y"]) <= NEAR_WARN}
                 self.tracks.append({"x": p["x"], "y": p["y"], "t": c.time, "hist": [], "room": p.get("room") or room,
-                                    "ll": {g: 0.0 for g in self.goals}, "v": 0.0})
+                                    "ll": {g: 0.0 for g in self.goals}, "v": 0.0, "came_from": inside})
 
     # ---- STEP 秒ごとに行き先を推定する
     def step(self):
@@ -172,17 +176,27 @@ class Predict(Rule):
             tr["hist"] = (tr["hist"] + [(c.time, d)])[-10:]
             prob = self._posterior(tr["ll"])
             tr["prob"] = prob
+            # ふつうの行き先 (トイレの扉の前など) に着いた人は、そこが行き先だった。危ない場所のすぐそばでなければ見送る
+            # (着く直前は、着いた所への距離が縮まらなくなり、その先の危ない場所の確率が上がって見えるため)
+            arrived = min((d[g] for g in self.goals if g.startswith("room:")), default=math.inf) <= ARRIVED
             for name, h in self.hazards.items():
                 p, dist = prob[name], d[name]
+                if name in tr.get("came_from", ()):
+                    if dist > NEAR_WARN + 0.5:
+                        tr["came_from"].discard(name)       # 出ていった。ここからはふつうに見る
+                    continue
                 risk = min(1.0, p * float(h.get("severity", 1.0)))
                 eta = dist / tr["v"] if tr["v"] > 0.15 else math.inf
                 a = self.active.get(name)
-                high = risk >= P_WARN and p >= P_WARN_RAW and eta <= ETA_WARN
+                high = risk >= P_WARN and p >= P_WARN_RAW and eta <= ETA_WARN and not arrived
                 streak = tr.setdefault("streak", {})
                 streak[name] = streak.get(name, 0) + 1 if high else 0
-                if streak[name] >= 2 or dist <= NEAR_WARN:      # 声を出すのは 2 回続けて確からしいとき (外れを減らす)
+                # すぐそばまで来たら確率にかかわらず警告する。ただし近づいているときだけ (居間の真ん中に立っているだけで
+                # 隣の廊下の階段について何度も警告していた)
+                near = dist <= NEAR_WARN and tr["v"] > 0.1 and not arrived
+                if streak[name] >= 2 or near:      # 声を出すのは 2 回続けて確からしいとき (外れを減らす)
                     self._warn(name, h, tr, p, eta, dist)
-                elif risk >= P_PREPARE and eta <= ETA_PREPARE:
+                elif risk >= P_PREPARE and eta <= ETA_PREPARE and not arrived:
                     self._prepare(name, h, tr, p, eta, dist)
                 elif a and not high:
                     if risk >= P_CLEAR:

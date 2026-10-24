@@ -66,6 +66,8 @@ class BlindSpot(Rule):
         if lab in ("ok", "unclear"):
             c.log(f"{label}から返事があった → 待つ", kind="blind_ok", room=room)
             nxt.say("わかった。ゆっくりでいいよ。")
+            d = c.home["robot"]["dock"]
+            nxt.go(d["x"] * M, d["y"] * M, 0.3)     # 扉の前から離れて待つ (出てきた子どもとぶつからない)
         elif lab in ("hurt", "help"):
             v = judge_rules({"who": "のび太", "room": room, "room_label": label, "replies": j.replies,
                              "posture": None, "found": False})

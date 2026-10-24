@@ -8,14 +8,15 @@
 import math
 import threading
 
-from home.judge import classify_reply, judge, start_loading
+from home.judge import classify_cues, classify_reply, judge, start_loading
 from home.vda5050 import action
 
 from .base import LABEL, Job, Rule, result_json
 
 FALL_CONFIRM = 3.0     # 横になった人をこれだけ続けて見たら疑う [s]
 GAME_CONFIRM = 240.0   # かくれんぼの最中は、隠れて伏せていることがあるので長く待つ (痛がる声がすればすぐ)
-VOICE_CONFIRM = 1.0    # 痛がる声が聞こえた部屋なら、これだけ見れば疑う [s]
+VOICE_AFTER = 120.0    # 転倒を確かめた部屋では、これだけの間マイクの声を新しい転倒のきっかけにしない [s]
+VOICE_CONFIRM = 1.0   # 痛がる声が聞こえた部屋なら、これだけ見れば疑う [s]
 VOICE_RECENT = 15.0    # 声をこの秒数のあいだ手がかりにする [s]
 SAME_PLACE = 1.5       # 同じ人とみなす距離 [m] (2 台のカメラの推定は 1 m ほどずれることがある)
 LISTEN = 8.0           # 返事を待つ秒数
@@ -37,9 +38,12 @@ class Fall(Rule):
         start_loading()
 
     def _on_heard(self, t, voice):
-        lab, _, _ = classify_reply(voice["text"], wait=False)
+        # たまたま聞こえた声は、はっきりした手がかり (いたっ・うわーん・たすけて など) があるときだけ痛がる声とする
+        lab, _, _ = classify_cues(voice["text"])
         if lab in ("hurt", "help"):
             room = voice.get("room") or self.c.cam_room.get(t.split("/")[1], "?")
+            if self.c.busy("fall") or self.c.time - self.c.attended.get(room, -1e9) < VOICE_AFTER:
+                return      # 転倒を確かめている最中か直後: 子どもの返事 (「いてて…でもへーき」) を新しい転倒としない
             self.distress[room] = self.c.time
             self.c.log(f"{LABEL.get(room, room)}のマイク: 「{voice['text']}」(痛がる声)", kind="distress_voice", room=room)
 

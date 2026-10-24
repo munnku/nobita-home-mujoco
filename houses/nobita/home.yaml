@@ -4,9 +4,11 @@ robot:
 stretch:
   dock: {x: 0.55, y: 4.6, yaw: 0}       # 片付け係 Stretch 3 の待機場所 (DK の流し台と冷蔵庫の間)
   box: [1.15, 5.5]                      # 片付けの箱 (冷蔵庫の東。sim/world.py の TIDY_BOX と同じ)
+# look: 人形の見た目 (sim/scene.py の LOOKS)。child = 子ども (約 1.3 m)、adult = 家の大人、stranger = 知らない大人 (帽子・マスク)
 people:
-  - {name: tamako, label: ママ (玉子)}
-  - {name: nobita, label: のび太}
+  - {name: tamako, label: ママ (玉子), look: adult}
+  - {name: nobita, label: のび太, look: child}
+  - {name: stranger, label: 知らない人, look: stranger}   # 不審者 (ふだんは家の外)
 # 人役を置く場所 (足元の位置と顔の向き)
 places:
   dk_kitchen: {x: 1.2, y: 2.6, yaw: 180, level: 1F}     # 流し台の前
@@ -67,7 +69,7 @@ everyday_spots:
   dk_table: [2.4, 4.7]
   rouka: [8.0, 5.0]
   senmen: [7.0, 6.7]
-  toilet: [8.5, 6.6]
+  toilet: [8.5, 5.4]          # トイレの扉の前 (廊下)。中だと、扉の前に着いたあと距離が縮まらず、廊下の先の玄関と見分けられない
 # カメラを置かない部屋 (人感センサーだけ)。x y はマス。max_stay: これより長くいたらアヒルが声をかけに行く [s]
 # (場面を短くするため短くしてある。実際の家では脱衣所 15 分・トイレ 20 分など)
 blind_rooms:

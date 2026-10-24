@@ -23,7 +23,7 @@ from house import load as load_layout
 from navigator import Navigator
 from objects import Objects, add_objects
 from stretch import BASE_RADIUS, Stretch, add_stretch
-from scene import compose, person_pose
+from scene import LOOKS, compose, person_pose
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_HOUSE = os.path.join(ROOT, "houses", "nobita")
@@ -41,9 +41,21 @@ STRETCH_SPEED = 0.25                    # Stretch の前進の上限 [m/s]
 TIDY_BOX = (1.15, 5.5, 0.30, 0.25, 0.12)  # 片付けの箱 (x, y [マス]、幅・奥行き・高さ [m])。DK の冷蔵庫の東
 
 
+def person_looks(house_dir, n):
+    """人 i の見た目 (home.yaml の people の look: child / adult / stranger。書いていなければ adult)。"""
+    path = os.path.join(house_dir, "home.yaml")
+    people = []
+    if os.path.exists(path):
+        import yaml
+        with open(path, encoding="utf-8") as f:
+            people = yaml.safe_load(f).get("people") or []
+    return [(people[i].get("look") if i < len(people) else None) or "adult" for i in range(n)]
+
+
 class World:
     def __init__(self, house_dir=DEFAULT_HOUSE, duck_pose=(0.0, 0.0, 0.0), n_persons=2,
-                 policy=None, objects=None, stretch=None):
+                 policy=None, objects=None, stretch=None, looks=None):
+        """looks: 人ごとの見た目 (sim/scene.py の LOOKS)。渡せば人数は len(looks)、無ければ home.yaml の people から。"""
         # 既定は、この家で強化学習した歩き方 (models/nobita_walk.onnx) があればそれ、なければ公開の velstand
         default = "nobita_walk" if os.path.exists(os.path.join(ROOT, "models", "nobita_walk.onnx")) else "velstand"
         policy = policy or os.environ.get("DUCK_POLICY", default)
@@ -51,7 +63,10 @@ class World:
             policy = os.path.join(ROOT, "models", policy + ".onnx")
         self.layout = load_layout(house_dir)
         self.module = self.layout["module"]
-        spec, self.door_open_q = compose(house_dir, duck=True, n_persons=n_persons)
+        if looks is not None:
+            n_persons = len(looks)
+        self.person_look = list(looks) if looks is not None else person_looks(house_dir, n_persons)
+        spec, self.door_open_q = compose(house_dir, duck=True, n_persons=n_persons, looks=self.person_look)
         obj_names = add_objects(spec, objects) if objects else []
         if stretch:
             add_stretch(spec, "st_", (stretch[0], stretch[1], 0.0), stretch[2], weld_objects=obj_names)
@@ -61,10 +76,12 @@ class World:
         self.objects = Objects(self.model, self.data, obj_names) if obj_names else None
         self.stretch = None
         if stretch:
-            # 数 g の物を指で挟むには滑りの補正 (noslip) が要る (docs/learning/pick_notes.md。アヒルの歩き方は変わらない)
-            self.model.opt.noslip_iterations = 3
-            self.stretch = Stretch(self.model, self.data, "st_",
-                                   weld_assist=os.environ.get("STRETCH_WELD_ASSIST", "1") == "1")
+            weld = os.environ.get("STRETCH_WELD_ASSIST", "1") == "1"
+            # 補助 (weld) なしで数 g の物を指で挟むには滑りの補正 (noslip) が要る (docs/learning/pick_notes.md)。
+            # ただし noslip は家全体にかかり、アヒルの足が滑らなくなって歩き方が変わる (指令 0.4 で 0.29 → 0.15 m/s、
+            # その場で回れない、止めても 0.27 m 進む)。補助ありなら noslip なしでも拾える (99〜100%) ので、補助のときは切る
+            self.model.opt.noslip_iterations = 0 if weld else 3
+            self.stretch = Stretch(self.model, self.data, "st_", weld_assist=weld)
             self.stretch.reset(*stretch)
         m = self.model
         self.n_persons = n_persons
@@ -182,7 +199,7 @@ class World:
                                 ("n", [0, d / 2, h / 2], [w / 2, t / 2, h / 2]), ("s", [0, -d / 2, h / 2], [w / 2, t / 2, h / 2]),
                                 ("e", [w / 2, 0, h / 2], [t / 2, d / 2, h / 2]), ("w", [-w / 2, 0, h / 2], [t / 2, d / 2, h / 2])):
             b.add_geom(name=f"tidy_box_{name}", type=mujoco.mjtGeom.mjGEOM_BOX, pos=pos, size=size,
-                       rgba=[0.25, 0.45, 0.75, 1], group=1)
+                       rgba=[0.86, 0.85, 0.80, 1], group=1)   # 薄い灰色 (青だと YOLO が紺の半ズボンの子どもと見た)
 
     def tidy_box_xyz(self):
         x, y, *_ = TIDY_BOX
@@ -270,7 +287,8 @@ class World:
         if x is None:
             pos, quat = person_pose(-1.5 - i, -2.5, 0.0, "stand", floor_z=-0.45)
         else:
-            pos, quat = person_pose(x, y, yaw, pose, self.layout["levels"][level]["z"] + dz)
+            pos, quat = person_pose(x, y, yaw, pose, self.layout["levels"][level]["z"] + dz,
+                                    scale=LOOKS[self.person_look[i]]["scale"])
         self.data.mocap_pos[mid] = pos
         self.data.mocap_quat[mid] = quat
         # 見せ方の group: 1 階の人は 1、2 階の人は 2 階と同じ 4 (1 階の見下ろしで浮いて見えないように)

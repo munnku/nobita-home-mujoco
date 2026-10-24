@@ -25,7 +25,8 @@ import threading
 LEVELS = ("info", "warn", "emergency")
 EMBED_MODEL = os.environ.get("JUDGE_EMBED_MODEL", "intfloat/multilingual-e5-small")
 API_MODEL = os.environ.get("JUDGE_API_MODEL", "claude-sonnet-5-5")
-UNCLEAR_MARGIN = 0.012   # いちばん近い分類と 2 番目の近さの差がこれより小さければ「あいまい」
+LOAD_WAIT = 15.0         # 返事を分けるとき、埋め込みのモデルの読み込みを待つ上限 [s]
+UNCLEAR_MARGIN = 0.012  # いちばん近い分類と 2 番目の近さの差がこれより小さければ「あいまい」
 
 EXAMPLES = {
     "ok": ["だいじょうぶ", "へーき", "平気だよ", "うん、なんともない", "ちょっところんだだけ", "もう痛くない",
@@ -132,11 +133,18 @@ def start_loading():
 
 
 def classify_reply(text, wait=True):
-    """(分類, 差, 点)。wait=False なら、モデルを読み込み中のときは言葉の手がかりだけで分ける (待たない)。"""
-    if not _ready.is_set() and not wait:
+    """(分類, 差, 点)。wait=False なら、モデルを読み込み中のときは言葉の手がかりだけで分ける (待たない)。
+    wait=True でも LOAD_WAIT 秒までしか待たない (計算機が混んでいると読み込みに 2 分ほどかかり、対話が止まっていた)。"""
+    if not _ready.is_set() and (not wait or not _ready.wait(LOAD_WAIT)):
         return _cues_only(text)
     with _lock:
         return _clf.classify(text)
+
+
+def classify_cues(text):
+    """言葉の手がかり (正規表現) だけで分ける。マイクがたまたま聞いた声 (問いかけへの返事ではない) に使う。
+    埋め込みは返事を分けるためのもので、「はーい」のような短い声を「痛がっている」に寄せてしまう。"""
+    return _cues_only(text)
 
 
 def _cues_only(text):

@@ -16,6 +16,7 @@ RES = 0.05            # 1 マス 5 cm
 ROBOT_RADIUS = 0.15   # アヒルの足元の半径 + 余裕
 CLEARANCE = 0.30      # これより壁に近いと費用が増える
 BAND = (0.01, 0.35)   # アヒルがぶつかる高さ
+DROP_MARGIN = 0.15    # 床が下がっている所 (土間) の縁から、さらにこれだけ離す [m] (ロボットの半径に足される)
 SIGHT_CLEARANCE = 0.15  # 人を見る線から家具までの距離がこれより近いと見通しが悪いとする
 
 
@@ -114,6 +115,7 @@ class FloorMap:
         mujoco.mj_kinematics(m, d)
         floor = np.zeros((self.w, self.h), bool)
         obst = np.zeros((self.w, self.h), bool)
+        drop = np.zeros((self.w, self.h), bool)     # 床が下がっている所 (玄関の土間)
         for g in range(m.ngeom):
             if m.geom_bodyid[g] in self.ignore:
                 continue
@@ -125,6 +127,8 @@ class FloorMap:
             if name.startswith("floor_") and abs(zhi) < 0.01:
                 self._fill(floor, pts)
                 continue
+            if name.startswith("floor_") and zhi < -0.05:
+                self._fill(drop, pts)
             if m.geom_contype[g] == 0 and m.geom_conaffinity[g] == 0:
                 continue
             if name.startswith("floor_") or name.startswith("outside_"):
@@ -133,6 +137,9 @@ class FloorMap:
                 self._fill(obst, pts, grow=RES * 0.75)  # 薄い物 (扉の板) がセルの間をすり抜けないように
         self.floor = floor
         self.obstacle = obst | ~floor
+        if drop.any():
+            # 段差の縁は壁より広く離れる (勢いのまま近づくと落ちる。アヒルが上がり框から土間へ落ちて起き上がれなかった)
+            self.obstacle |= self._distance(drop) * RES < DROP_MARGIN
         # 障害物からの距離 (セル) を求めて、膨らませと費用に使う
         self.dist = self._distance(self.obstacle) * RES
         self.free = self.dist > self.radius

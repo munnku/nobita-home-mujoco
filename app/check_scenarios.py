@@ -134,7 +134,26 @@ def check_patrol(events):
     return ok, f"置いた {len(placed)} 個のうち {hits} 個を見つけた / 誤り {wrong} 個 / {err} / {tidy}"
 
 
-CHECKS = {"hide_sofa": check_hide, "hide_table": check_hide, "hide_cupboard": check_hide, "hazard_patrol": check_patrol,
+def check_afternoon(events):
+    """物語 orusuban_afternoon: 章ごとの印が全部そろったか (時刻つきで並べる)。"""
+    logs = [e["payload"] for e in events if e["topic"] == "home/log" and isinstance(e["payload"], dict)]
+    alerts = [e["payload"] for e in events if e["topic"] == "home/alerts"]
+    first = lambda pred: next((p for p in logs if pred(p)), None)  # noqa: E731
+    marks = [("迎える", first(lambda p: p.get("kind") == "greet" and p.get("who") in (None, "child"))),
+             ("おるすばん", first(lambda p: p.get("kind") == "alone_start")),
+             ("転倒の判断 info", next((a for a in alerts if a.get("type") == "fall_report" and a.get("level") == "info"), None)),
+             ("コンロで止まった", first(lambda p: p.get("kind") == "child_stopped")),
+             ("トイレの返事", first(lambda p: p.get("kind") == "blind_ok")),
+             ("片付け", first(lambda p: p.get("kind") == "tidy_finished" and p.get("count", 0) >= 2)),
+             ("かくれんぼで発見", first(lambda p: p.get("kind") == "hide_found"))]
+    chapters = [e["payload"] for e in events if e["topic"] == "sim/scenario" and "chapter" in e["payload"]]
+    why = " / ".join(f"{n} {p['time']}s" if p else f"{n} なし" for n, p in marks)
+    return all(p for _, p in marks), f"章 {len(chapters)} 個 / " + why
+
+
+STORIES = {"orusuban_afternoon"}      # houses/nobita/stories/ の物語 (run_scenario.py --story で回す)
+
+CHECKS = {"orusuban_afternoon": check_afternoon, "hide_sofa": check_hide, "hide_table": check_hide, "hide_cupboard": check_hide, "hazard_patrol": check_patrol,
           "senmen_silent": check_blind("emergency", "blind_lying"), "toilet_long": check_blind(None, "blind_ok"),
           "danger_stove": check_danger("stove"), "danger_genkan": check_danger("genkan"),
           "danger_bath": check_danger("bath"),
@@ -162,7 +181,8 @@ def main():
             before = set(glob.glob(os.path.join(ROOT, "build", "runs", f"{name}_*.json")))
             log = os.path.join(ROOT, "build", "runs", f"{name}_{datetime.datetime.now():%Y%m%d_%H%M%S}.log")
             with open(log, "w", encoding="utf-8") as lf:     # 司令塔・シミュレーションの出力 (うまくいかなかったときに見る)
-                subprocess.run([PY, os.path.join(ROOT, "app", "run_scenario.py"), "--scenario", name, "--speed", a.speed],
+                subprocess.run([PY, os.path.join(ROOT, "app", "run_scenario.py"),
+                                "--story" if name in STORIES else "--scenario", name, "--speed", a.speed],
                                stdout=lf, stderr=subprocess.STDOUT, env={**os.environ, "PYTHONUTF8": "1"})
             new = sorted(set(glob.glob(os.path.join(ROOT, "build", "runs", f"{name}_*.json"))) - before)
             if not new:

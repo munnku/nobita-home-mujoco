@@ -7,6 +7,8 @@
   アヒルの頭のような低いカメラでは、体の上端の高さ (LYING_HEIGHT) で決める。
   上端が絵の外で切れていれば判定しない (unknown)。頭の高さ (足元の鉛直の面での高さ) は参考に出す
 - 横になっている人の位置: 枠の下端と上端の床への投影の中点 (体の真ん中)
+- だれか (who): 見分けを学習した重み (6 クラス = 見た目 child / adult / stranger × 姿勢) なら、クラスの見た目を返す。
+  2 クラスの重みや公開の YOLOv8s では None
 カメラの位置・向き・画角は MuJoCo のモデルから読む (事前の較正は不要という前提)。
 """
 import math
@@ -16,8 +18,23 @@ import numpy as np
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 YOLO_WEIGHTS = os.path.join(ROOT, "third_party", "yolov8s.pt")              # 公開の YOLOv8s (COCO)
-FINETUNED_WEIGHTS = os.path.join(ROOT, "models", "yolo_nobita.pt")          # この家で追加学習したもの (2 クラス)
-POSTURE_CLASSES = {"person_standing": "standing", "person_lying": "lying"}
+FINETUNED_WEIGHTS = os.path.join(ROOT, "models", "yolo_nobita.pt")          # この家で追加学習したもの (2 クラス: 姿勢)
+WHO_WEIGHTS = os.path.join(ROOT, "models", "yolo_nobita_who.pt")            # 見分けも学習したもの (6 クラス: 見た目 × 姿勢)
+# 環境変数 YOLO_WEIGHTS: 重みのファイル、または who (6 クラス) / posture (2 クラス) / coco (公開の YOLOv8s)
+WEIGHT_NAMES = {"who": WHO_WEIGHTS, "posture": FINETUNED_WEIGHTS, "coco": YOLO_WEIGHTS}
+POSTURES = {"standing", "lying"}
+WHO = {"child", "adult", "stranger"}
+
+
+def parse_class(name):
+    """YOLO のクラス名 → (姿勢, だれか)。person_lying → ('lying', None)、child_standing → ('standing', 'child')、
+    person (COCO) → (None, None)。人でないクラスは None。"""
+    if name == "person":
+        return None, None
+    who, _, posture = name.rpartition("_")
+    if posture not in POSTURES or who not in WHO | {"person"}:
+        return None
+    return posture, (who if who in WHO else None)
 LYING_LENGTH = 2.6     # 枠の上端と下端の床への投影がこれより近ければ横になっている [m] (高いカメラ)
 LYING_HEIGHT = 0.8     # 体の上端がこれより低ければ横になっている [m] (低いカメラ)
 HIGH_CAMERA = 1.5      # これより高いカメラは天井のカメラとして扱う [m]
@@ -26,30 +43,33 @@ MIN_SCORE = 0.4
 
 
 class PersonDetector:
-    """weights=None なら、追加学習したモデル (models/yolo_nobita.pt) があればそれを、なければ公開の YOLOv8s を使う。
-    追加学習したモデルはクラスで姿勢を返す (枠の 6 番目の値)。公開のモデルでは姿勢は幾何で決める。"""
+    """weights=None なら、環境変数 YOLO_WEIGHTS、無ければ見分けも学習したモデル (models/yolo_nobita_who.pt)、
+    2 クラスのモデル (models/yolo_nobita.pt)、公開の YOLOv8s の順で、ある物を使う。
+    追加学習したモデルはクラスで姿勢 (枠の 6 番目の値) を、6 クラスのモデルはだれか (7 番目) も返す。
+    公開のモデルでは姿勢は幾何で決める。"""
 
     def __init__(self, weights=None):
         from ultralytics import YOLO
         if weights is None:
-            weights = os.environ.get("YOLO_WEIGHTS") or (
-                FINETUNED_WEIGHTS if os.path.exists(FINETUNED_WEIGHTS) else YOLO_WEIGHTS)
+            weights = os.environ.get("YOLO_WEIGHTS") or next(
+                w for w in (WHO_WEIGHTS, FINETUNED_WEIGHTS, YOLO_WEIGHTS) if os.path.exists(w))
+        weights = WEIGHT_NAMES.get(weights, weights)
         self.weights = weights
         self.yolo = YOLO(weights)
-        self.classes = [k for k, v in self.yolo.names.items() if v == "person" or v in POSTURE_CLASSES]
+        self.kind = {k: parse_class(v) for k, v in self.yolo.names.items() if parse_class(v) is not None}
+        self.classes = list(self.kind)
         print(f"[perception] YOLO: {os.path.basename(weights)} classes={[self.yolo.names[k] for k in self.classes]}",
               flush=True)
 
     def detect(self, images):
-        """images: RGB の絵のリスト。絵ごとに [(x1, y1, x2, y2, score, 姿勢 or None), ...] を返す。"""
+        """images: RGB の絵のリスト。絵ごとに [(x1, y1, x2, y2, score, 姿勢 or None, だれか or None), ...] を返す。"""
         if not images:
             return []
         bgr = [np.ascontiguousarray(im[..., ::-1]) for im in images]   # YOLO は numpy を BGR とみなす
         results = self.yolo(bgr, verbose=False, classes=self.classes, conf=MIN_SCORE)
         out = []
         for r in results:
-            out.append([tuple(float(v) for v in b.xyxy[0]) + (float(b.conf),
-                                                               POSTURE_CLASSES.get(self.yolo.names[int(b.cls)]))
+            out.append([tuple(float(v) for v in b.xyxy[0]) + (float(b.conf), *self.kind[int(b.cls)])
                         for b in r.boxes])
         return out
 
@@ -105,9 +125,11 @@ class CameraModel:
 
 
 def estimate_person(cam, box, floor_z=0.0, margin=4):
-    """枠 (x1, y1, x2, y2, score) から {'x','y','posture','height','score'} を推定する (床に届かなければ None)。"""
+    """枠 (x1, y1, x2, y2, score[, 姿勢, だれか]) から {'x','y','posture','who','height','score'} を推定する
+    (床に届かなければ None)。who は 6 クラスのモデルの見た目 (child / adult / stranger)、ほかのモデルでは None。"""
     x1, y1, x2, y2, score = box[:5]
     learned = box[5] if len(box) > 5 else None    # 追加学習したモデルが返した姿勢
+    who = box[6] if len(box) > 6 else None
     uc = (x1 + x2) / 2
     foot = cam.floor_point(uc, y2, floor_z)
     if foot is None:
@@ -141,7 +163,7 @@ def estimate_person(cam, box, floor_z=0.0, margin=4):
         elif learned == "standing":
             x, y = float(foot[0]), float(foot[1])
         posture = learned
-    return {"x": round(x, 2), "y": round(y, 2), "posture": posture,
+    return {"x": round(x, 2), "y": round(y, 2), "posture": posture, "who": who,
             "height": None if height is None else round(height, 2),
             "length": None if length is None else round(length, 2), "score": round(score, 2)}
 

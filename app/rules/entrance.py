@@ -37,10 +37,32 @@ class Entrance(Rule):
             e["closed_since"] = None
 
     def _result(self, j):
+        c = self.c
         res = result_json(j.last[0] if j.last else None)
-        if res.get("found"):
-            self.c.log("玄関に人がいた → 迎える", kind="greet")
-            j.say("おかえりなさい！手を洗ってね。")
-        else:
-            self.c.log("玄関に人が見えない", kind="no_one")
+        if not res.get("found"):
+            c.log("玄関に人が見えない", kind="no_one")
             j.say("どなたですか？")
+            return
+        # だれかはアヒルの目の YOLO (who: child / adult / stranger) で見分ける。見分けない重みのときは、
+        # だれもいない家 (away) に鍵を開けて入ってきたのは子ども、家族がいるときは家の人とみなす
+        who = res.get("who") or ("child" if c.mode == "away" else "adult")
+        if who == "stranger":
+            c.log("玄関に知らない大人がいる → 声をかけ、保護者に知らせる", kind="stranger", who=who)
+            j.say("どなたですか？ご家族に知らせます。", intent="ask_who")
+            c.speaker("rouka", "どなたですか？家の人に知らせました。")
+            c.m.publish("home/alerts", {"type": "stranger", "level": "emergency", "room": "genkan", "time": round(c.time, 1),
+                                        "summary": "玄関に知らない人が入ってきました。すぐに確かめてください。",
+                                        "evidence": res.get("image")}, qos=1)
+            return
+        if who == "child":
+            c.log("玄関に子どもがいた → 迎える", kind="greet", who=who)
+            j.say(f"{self.cfg.get('child_name', 'のび太')}くん、おかえり！手を洗ってね。", intent="greet")
+            d = c.home["robot"]["dock"]
+            j.go(d["x"] * M, d["y"] * M, 0.3)       # 先に居間へ戻る (廊下で子どもの通り道をふさがない)
+            if c.mode == "away":
+                # 子どもが帰ってきたが、家の大人は出かけている: おるすばんモードにする
+                c.m.publish("home/mode", "alone", retain=True)
+                c.log("のび太が帰ってきた。ママは出かけているので、おるすばんモードにする", kind="alone_start")
+        else:
+            c.log("玄関に家の人がいた → 迎える", kind="greet", who=who)
+            j.say("おかえりなさい！")
