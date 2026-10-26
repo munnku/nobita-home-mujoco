@@ -53,8 +53,7 @@ stranger_door (鍵の閉め忘れから不審者) / mama_home / outing (無断�
 
 **録画 (Claude Pro の `claude -p` で LLM を動かして、`--speed 1`、10/26)**
 - 物語 `orusuban_afternoon` (10 章) を `build/videos/orusuban_afternoon_v7.mp4` に録り、`app/cut_clips.py` で 27 本に切った
-  (`build/videos/orusuban_afternoon_clips/`、勧める倍速で 178 秒)。対話の場面は、LLM が考える間 (1 回 10 秒ほど、だれも話していない間)
-  を詰めている (`squeeze: true`。API ならこの待ちは短い)。
+  (`build/videos/orusuban_afternoon_clips/`、録ったままの長さ 910 秒)。倍速や、LLM が考える間 (1 回 10 秒ほど) を詰めるかは編集で決める。
 - 分かれ道の別の場合は場面ごとに録った (`build/videos/orusuban_variants/`、11 本、全部 PASS): fall_hurt (warn) / fall_silent (emergency) /
   senmen_silent / intercom_delivery / mama_home / stranger_door / outing / fire_kitchen / blackout / voice_scared / multi。
 - 録って分かったこと:
