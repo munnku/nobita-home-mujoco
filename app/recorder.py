@@ -65,7 +65,8 @@ class Recorder:
         show = self.focus_room if self.w.time < self.focus_until else room
         cam_name = self._room_camera(devices, show) or self._room_camera(devices, room)
         st = self.w.stretch
-        if st is not None and st.phase is not None:
+        arm = st is not None and st.status == "running"      # (終わったあとも phase は残るので status で見る)
+        if arm:
             # Stretch が腕で拾う・置く間は、上から小さくしか見えないので後ろから近くで映す
             cam_name = None
             sx, sy, syaw = st.pose()
@@ -91,7 +92,7 @@ class Recorder:
         status = agent.status_text() if agent else ""
         d.text((10, 8), f"t = {self.w.time:5.1f} s   アヒル: {room or '-'}  {status}", font=self.font, fill=(0, 0, 0))
         label = (f"見守りカメラ ({cam_name})" if cam_name else
-                 "片付け係 (Stretch 3)" if st is not None and st.phase is not None else "アヒルの上から")
+                 "片付け係 (Stretch 3)" if arm else "アヒルの上から")
         d.text((808, 4), label, font=self.font_small, fill=(255, 255, 255))
         d.text((808, 274), "頭のカメラ", font=self.font_small, fill=(255, 255, 255))
         if agent and agent.speech:

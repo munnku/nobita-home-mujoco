@@ -75,7 +75,8 @@ def main():
         mq.subscribe("home/log", on_log)
         mq.subscribe("home/speech", lambda t, p: rec.log(f"[{p.get('speaker')}]「{p.get('text')}」")
                      if isinstance(p, dict) and p.get("speaker") != "microduck-01" else None)
-        mq.subscribe("home/voice", lambda t, p: rec.log(f"[{p.get('who')}]「{p.get('text')}」")
+        label = {p["name"]: p.get("label", p["name"]) for p in home["people"]}     # 録画には id でなく呼び名を出す
+        mq.subscribe("home/voice", lambda t, p: rec.log(f"[{label.get(p.get('who'), p.get('who'))}]「{p.get('text')}」")
                      if isinstance(p, dict) else None)
     viewer = None
     if a.viewer:
