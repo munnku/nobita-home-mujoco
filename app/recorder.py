@@ -1,4 +1,5 @@
-"""動画に残す: 見下ろし (1 階) + アヒルの後ろから + 頭のカメラ + 状況の文字 を 1 枚にして MP4 に書く。"""
+"""動画に残す: 見下ろし (1 階) + アヒルの後ろから + 頭のカメラ + 状況の文字 を 1 枚にして MP4 に書く。
+左上 (庭の上) にタスク一覧 (home/tasks)、見下ろしの下に保護者のスマホへの最新の知らせ (home/alerts) を重ねる。"""
 import math
 import os
 import sys
@@ -39,6 +40,8 @@ class Recorder:
         self.lines = []            # 状況の文 (新しいものが下)
         self.head_boxes = []
         self.focus_room, self.focus_until = None, 0.0
+        self.tasks = []             # タスク一覧 (home/tasks)
+        self.alert = None           # (時刻, 知らせ) 保護者のスマホへの最新の知らせ
 
     def focus(self, room, seconds=25.0):
         """しばらくその部屋の見守りカメラを出す (司令塔が部屋のことを知らせたとき)。"""
@@ -95,12 +98,41 @@ class Recorder:
                  "片付け係 (Stretch 3)" if arm else "アヒルの上から")
         d.text((808, 4), label, font=self.font_small, fill=(255, 255, 255))
         d.text((808, 274), "頭のカメラ", font=self.font_small, fill=(255, 255, 255))
+        self._overlay(img, d)
         if agent and agent.speech:
             d.rectangle([810, 500, 1270, 536], fill=(255, 255, 220))
             d.text((818, 506), f"アヒル「{agent.speech[1]}」", font=self.font_small, fill=(0, 0, 0))
         for k, line in enumerate(self.lines):
             d.text((808, 546 + k * 19), line, font=self.font_small, fill=(230, 230, 230))
         self.vw.write(np.asarray(img)[..., ::-1])
+
+    CAT = {"予防": (90, 170, 255), "検知": (255, 200, 80), "対応支援": (120, 220, 120), "通知": (255, 140, 140)}
+    LEVEL = {"info": (230, 230, 230), "checking": (230, 230, 230), "warn": (255, 210, 60), "emergency": (255, 90, 90)}
+
+    def _overlay(self, img, d):
+        """タスク一覧と保護者への知らせを重ねる。"""
+        box = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        b = ImageDraw.Draw(box)
+        items = self.tasks[:5]
+        if items:
+            h = 26 + 20 * len(items)
+            b.rectangle([4, 36, 236, 36 + h], fill=(20, 20, 30, 200))
+        al = self.alert if self.alert and self.w.time - self.alert[0] < 25 else None
+        if al:
+            b.rectangle([0, 692, 800, 720], fill=(20, 20, 30, 220))
+        img.paste(Image.alpha_composite(img.convert("RGBA"), box).convert("RGB"))
+        if items:
+            d.text((10, 39), "タスク一覧 (重い順)", font=self.font_small, fill=(255, 255, 255))
+            for k, t in enumerate(items):
+                mark = "▶" if t.get("state") == "running" else "・"
+                label = str(t.get("label", t.get("name")))[:11]
+                d.text((10, 61 + 20 * k), f"{mark}{label}", font=self.font_small,
+                       fill=self.CAT.get(t.get("category"), (220, 220, 220)))
+        if al:
+            a = al[1]
+            who = "2人目の家族" if a.get("to") == "family2" else "保護者"
+            d.text((8, 696), f"{who}のスマホ [{a.get('level')}] {a.get('summary', '')}"[:46], font=self.font_small,
+                   fill=self.LEVEL.get(a.get("level"), (230, 230, 230)))
 
     @staticmethod
     def _room_camera(devices, room):

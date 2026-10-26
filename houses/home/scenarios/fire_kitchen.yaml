@@ -1,0 +1,16 @@
+# おるすばん中に台所の煙センサーが反応する。スピーカーで逃げ方を伝え、保護者に emergency。
+# アヒルが子どもの所へ行って話す。保護者が「見た」を返さないので、2 人目の家族に知らせ、子どもに 119 のかけ方を話す
+name: fire_kitchen
+description: 台所の煙 (火事の疑い)
+mode: alone
+duration: 150
+events:
+  - {t: 0, who: mama, at: outside}
+  - {t: 0, who: child, at: ousetsu_sofa, pose: stand}
+  - {t: 15, sensor: smoke, room: dk}
+replies:
+  child:
+    ask_ok: {say: "うん、けがはしてない。どうしよう、こわい", delay: 1.5}
+    ask_more: {say: "けむりの においがする", delay: 1.5}
+    instruct: {say: "わかった、そとに でる", delay: 1.5}
+    default: null

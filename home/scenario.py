@@ -12,7 +12,13 @@ mode: alone ならおるすばんモード (home/mode を retain で出す。司
   止まると、その人の unless_stopped: true のイベント (止められなければ行うこと) は行わない。
 危ない場所 (home.yaml の hazards) に人が入ったら sim/scenario に hazard_entered を出す (評価用)。
 床の小さい物 (objects): [{kind: button_battery, at: [x, y] (マス)}] を始めに床に置く (sim/objects.py)。
-{t, mqtt: トピック, payload: 値} はその時刻に MQTT に出す (家の人がアプリで頼んだこと。例: 見回りの依頼)。
+{t, mqtt: トピック, payload: 値} はその時刻に MQTT に出す (家の人がアプリで頼んだこと。例: 見回りの依頼、知らせの「見た」)。
+災害と来客:
+  {t, intercom: ring, who: 訪問者, say: "宅配便です"}  インターホンを鳴らして話す (訪問者は体を持たない。返事は replies の
+                                                     その名前の台本で、インターホンの問いかけに答える)
+  {t, sensor: smoke, room: dk}                     煙センサーが煙を検知する
+  {t, emergency: earthquake, shake: 15}            緊急地震速報 (home/emergency)。shake はゆれる秒数
+  {t, emergency: blackout} / {t, emergency: power_restored}   停電と復旧 (照明が消える)
 """
 import math
 import os
@@ -57,6 +63,30 @@ class Scenario:
             self.k += 1
             if "door" in e:
                 self._door(e)
+                continue
+            if "intercom" in e:
+                if self.devices:
+                    self.devices.ring()
+                self.voices.at_door.add(e["who"])
+                if e.get("say"):
+                    self.voices.visitor_say(e["who"], e["say"])
+                print(f"[scenario] t={self.w.time:.1f} インターホン: {e['who']}", flush=True)
+                continue
+            if "sensor" in e:
+                if self.devices:
+                    self.devices.set_smoke(e.get("room", "dk"), e.get("value", True))
+                self.m.publish("sim/scenario", {"time": round(self.w.time, 1), "sensor": e["sensor"], "room": e.get("room")})
+                print(f"[scenario] t={self.w.time:.1f} 煙センサー ({e.get('room', 'dk')})", flush=True)
+                continue
+            if "emergency" in e:
+                kind = e["emergency"]
+                if kind in ("blackout", "power_restored") and self.devices:
+                    self.devices.power(kind == "power_restored")
+                else:
+                    self.m.publish("home/emergency", {"type": kind, "shake": e.get("shake", 15), "source": "緊急地震速報",
+                                                      "time": round(self.w.time, 1)})
+                self.m.publish("sim/scenario", {"time": round(self.w.time, 1), "emergency": kind})
+                print(f"[scenario] t={self.w.time:.1f} {kind}", flush=True)
                 continue
             if "mqtt" in e:
                 self.m.publish(e["mqtt"], e.get("payload", {}))

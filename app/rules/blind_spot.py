@@ -1,19 +1,19 @@
 """カメラを置けない所 (脱衣所・浴室・トイレ) の見守り。おるすばんモード (home/mode = alone) のときだけ働く。
 
 - 人感センサーで、子どもがカメラの無い部屋にいると分かる。そこに max_stay 秒より長くいたら、アヒルが扉の前へ行き、
-  声をかけて返事を聞く (返事は台本。home/voice.py)
+  声をかけて返事を聞く (返事は台本。home/voice.py)。返事の意味は対話 (talk.py → LLM) で分ける
 - 返事があれば (平気・あいまいでも声が返れば) 「ゆっくりでいいよ」と言って戻る。また max_stay 秒たてば聞きに行く
 - 返事がなければもう一度呼ぶ。それでもなければ、扉が開いていれば中に入って姿勢だけを確かめる (privacy=true:
   絵は残さない)。横になっている・見つからない・扉が閉まっていて入れないときは、保護者に emergency
-- 痛い・助けての返事なら warn / emergency (home/judge.py の判断を使う)
+- 痛い・助けての返事なら warn / emergency (home/brain.py の規則の判断を使う)
 設定は home.yaml の blind_rooms (部屋 → 扉・アヒルが立つ所・中の見る所・max_stay)。
 """
-from home.judge import classify_reply, judge_rules
+from home.brain import judge_rules
 from home.vda5050 import action
 
 from .base import LABEL, M, Job, Rule, result_json
+from .talk import Dialogue
 
-LISTEN = 8.0
 ATTENDED = 300.0       # ほかの決まり (転倒) で確かめて知らせた部屋は、この秒数は聞きに行かない
 
 
@@ -47,20 +47,22 @@ class BlindSpot(Rule):
         label = LABEL.get(room, room)
         c.log(f"{label}に {c.time - self.since[room]:.0f} 秒いる (人感センサー、カメラなし) → アヒルが扉の前で声をかける",
               kind="blind_check", room=room)
-        x, y = (v * M for v in cfg["stand"])
-        job = Job("blind", 1).go(x, y, 0.3)
-        job.room, job.replies = room, []
-        job.say(f"{label}にいるの？だいじょうぶ？", intent="ask_ok").listen(LISTEN)
-        job.then(lambda j: self._heard(j, 1))
-        c.add_job(job)
+        c.add_job(self._job(room, cfg))
 
-    def _heard(self, j, n):
+    def _job(self, room, cfg):
+        x, y = (v * M for v in cfg["stand"])
+        job = Job("blind", 2).go(x, y, 0.3)
+        job.restart = lambda: self._job(room, cfg)       # 火事・地震で止められたら、初めから声をかけ直す
+        job.room = room
+        job.then(Dialogue(self.c, "blind", {"who": "子ども", "room": room, "room_label": LABEL.get(room, room)},
+                          self._heard).start)
+        return job
+
+    def _heard(self, j, dialogue, res):
+        """声をかけ終わった: 最後の返事の意味で、待つ・知らせる・中を確かめるを決める。"""
         c = self.c
-        heard = result_json(j.last[0] if j.last else None).get("heard") or []
-        text = " ".join(h["text"] for h in heard if h.get("who"))
-        lab = classify_reply(text)[0]       # 司令塔のスレッド (仕事の手順) から呼ぶので、読み込み中なら待つ
-        j.replies.append({"text": text or None, "label": lab})
-        c.log(f"返事: 「{text}」→ {lab}" if text else "返事がない", kind="reply", label=lab)
+        lab = dialogue.last_label()
+        text = " ".join(t.get("child") or "" for t in dialogue.ev["dialog"]).strip()
         room, label = j.room, LABEL.get(j.room, j.room)
         nxt = Job("tmp", 0)
         if lab in ("ok", "unclear"):
@@ -69,13 +71,10 @@ class BlindSpot(Rule):
             d = c.home["robot"]["dock"]
             nxt.go(d["x"] * M, d["y"] * M, 0.3)     # 扉の前から離れて待つ (出てきた子どもとぶつからない)
         elif lab in ("hurt", "help"):
-            v = judge_rules({"who": "子ども", "room": room, "room_label": label, "replies": j.replies,
+            v = judge_rules({"who": "子ども", "room": room, "room_label": label, "replies": dialogue.ev["replies"],
                              "posture": None, "found": False})
             self._alert(room, v["level"], f"子どもが{label}で「{text}」と言っています。{v['message_to_parent']}")
             nxt.say("おうちの人に知らせたよ。")
-        elif n == 1:
-            nxt.say("ねえ、聞こえる？返事をして！", intent="ask_ok").listen(LISTEN)
-            nxt.then(lambda j: self._heard(j, 2))
         else:
             door = self.cfg[room].get("door")
             if door and not c.door_open.get(door, True):      # 扉の開閉センサー (分からなければ開いているとみなす)
@@ -110,5 +109,4 @@ class BlindSpot(Rule):
 
     def _alert(self, room, level, summary):
         self.c.attended[room] = self.c.time
-        self.c.m.publish("home/alerts", {"type": "no_reply", "level": level, "room": room,
-                                         "time": round(self.c.time, 1), "summary": summary, "privacy": True}, qos=1)
+        self.c.notify("no_reply", level, summary, room=room, category="通知", privacy=True)

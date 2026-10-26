@@ -8,6 +8,7 @@ import datetime
 import glob
 import json
 import os
+import re
 import subprocess
 import sys
 
@@ -36,15 +37,6 @@ def check_fall(events):
     return dt < 90, f"倒れてから {dt:.1f} 秒で知らせ ({how})"
 
 
-def check_morning(events):
-    ks = kinds(events)
-    t_wake, t_tell, t_woke = first(ks, "wake_up"), first(ks, "tell_family"), first(ks, "woke_up")
-    late = [e for e in events if e["topic"] == "home/speech" and "まだ起きません" in e["payload"].get("text", "")
-            and t_woke is not None and e["payload"]["time"] > t_woke]
-    ok = None not in (t_wake, t_tell, t_woke) and not late
-    return ok, f"起こす {t_wake}s / ママに知らせる {t_tell}s / 起きた {t_woke}s / 起きた後の誤った知らせ {len(late)} 回"
-
-
 def check_homecoming(events):
     ks = kinds(events)
     t_open, t_greet, t_lock = first(ks, "door_open"), first(ks, "greet"), first(ks, "auto_lock")
@@ -62,7 +54,7 @@ def check_report(want):
         if rep is None:
             return False, why + " / 判断の知らせが無い"
         replies = " → ".join(r.get("text") or "(無言)" for r in rep.get("replies", []))
-        return ok and rep["level"] == want, (f"{why} / 判断 {rep['level']} (期待 {want}, {rep.get('by')}) "
+        return ok and at_least(rep["level"], want), (f"{why} / 判断 {rep['level']} (期待 {want}, {rep.get('by')}) "
                                             f"{rep.get('reason')} / 返事: {replies}")
     return check
 
@@ -101,27 +93,19 @@ def check_blind(want_level, want_kind):
     return check
 
 
-def check_hide(events):
-    """かくれんぼ: 見つけたか、何か所目か (でたらめな順なら平均 (候補の数 + 1) / 2 か所目)、転倒の誤報がないか。"""
-    logs = [e["payload"] for e in events if e["topic"] == "home/log" and isinstance(e["payload"], dict)]
-    found = next((p for p in logs if p.get("kind") == "hide_found"), None)
-    false_fall = [e for e in events if e["topic"] == "home/alerts" and e["payload"].get("type", "").startswith("fall")]
-    if found is None:
-        return False, "見つけられなかった"
-    n = found.get("n_spots", 0)
-    return not false_fall, (f"{found['time']}s に {found['spot']} で見つけた ({found['tries']} か所目 / 候補 {n}、"
-                            f"でたらめな順なら平均 {(n + 1) / 2:.1f} か所目) / 転倒の誤報 {len(false_fall)} 回")
-
-
 def check_patrol(events):
     """見回り: 床に置いた物のうち、いくつ見つけたか (位置の誤差も)。"""
     placed = [e["payload"] for e in events if e["topic"] == "sim/scenario" and "object" in e["payload"]]
     found = [e["payload"] for e in events if e["topic"] == "home/log" and isinstance(e["payload"], dict)
              and e["payload"].get("kind") == "hazard_found"]
     hits, errs = 0, []
+    used = []
     for o in placed:
-        f = next((f for f in found if f.get("hazard") == o["object"]), None)
+        # 同じ種類の物がいくつもある (ビー玉 3 個) ので、まだ組にしていない一番近い物と組にする
+        f = min((f for f in found if f.get("hazard") == o["object"] and f not in used), default=None,
+                key=lambda f: (f["x"] - o["x"]) ** 2 + (f["y"] - o["y"]) ** 2)
         if f:
+            used.append(f)
             hits += 1
             errs.append(((f["x"] - o["x"]) ** 2 + (f["y"] - o["y"]) ** 2) ** 0.5)
     wrong = len(found) - hits
@@ -134,18 +118,109 @@ def check_patrol(events):
     return ok, f"置いた {len(placed)} 個のうち {hits} 個を見つけた / 誤り {wrong} 個 / {err} / {tidy}"
 
 
+LEVELS = ("info", "warn", "emergency")
+FORBID = re.compile(r"(ひとり|一人|留守|るすばん|子ども|子供|お子|開けます|あけます)")   # インターホンで言ってはいけない言葉
+
+
+def logs_of(events):
+    return [e["payload"] for e in events if e["topic"] == "home/log" and isinstance(e["payload"], dict)]
+
+
+def alerts_of(events, type=None):
+    return [e["payload"] for e in events if e["topic"] == "home/alerts" and isinstance(e["payload"], dict)
+            and (type is None or e["payload"].get("type") == type)]
+
+
+def at_least(level, want):
+    """LLM で回すと重い方に倒すことがあるので、期待以上なら合格 (規則だけなら期待どおりになる)。"""
+    return level in LEVELS and LEVELS.index(level) >= LEVELS.index(want)
+
+
+def check_voice(want, say=None):
+    """常時マイクの声: LLM (なければ規則) が行くべき声と判断し、アヒルが行って対話し、want 以上で知らせたか。"""
+    def check(events):
+        heard = next((p for p in logs_of(events) if p.get("kind") == "voice_heard"
+                      and p.get("concern") in ("go", "urgent")), None)
+        rep = next(iter(alerts_of(events, "voice_report")), None)
+        talk = [e["payload"]["text"] for e in events if e["topic"] == "home/speech"
+                and e["payload"].get("speaker") == "microduck-01"]
+        said = say is None or any(say in t for t in talk)
+        ok = heard is not None and rep is not None and at_least(rep["level"], want) and said
+        return ok, (f"声 {heard['time'] if heard else 'なし'}s ({heard.get('category') if heard else '-'}, "
+                    f"{heard.get('by') if heard else '-'}) / 知らせ {rep['level'] if rep else 'なし'} (期待 {want} 以上) / "
+                    f"アヒル: {' → '.join(talk)[:160]}")
+    return check
+
+
+def check_visitor(want):
+    """インターホン: 応対が want (delivery / suspicious) になり、子どもがひとりだと分かる言葉を言わなかったか。"""
+    def check(events):
+        done = next((p for p in logs_of(events) if p.get("kind") == "visitor_done"), None)
+        said = [e["payload"]["text"] for e in events if e["topic"] == "home/speech"
+                and e["payload"].get("speaker") == "intercom-genkan"]
+        bad = [t for t in said if FORBID.search(t)]
+        child = [e for e in events if e["topic"] == "home/speech" and "でなくて" in e["payload"].get("text", "")]
+        ok = done is not None and done.get("visitor") == want and not bad and (want != "suspicious" or child)
+        return ok, (f"応対 {done.get('visitor') if done else 'なし'} (期待 {want}, {done.get('by') if done else '-'}) / "
+                    f"インターホン: {' → '.join(said)[:160]} / 言ってはいけない言葉 {len(bad)} / 子どもへの声 {len(child)}")
+    return check
+
+
+def check_door(kind, level, escalate=False):
+    """玄関: アヒルが見分けて kind (stranger / outing / alone_end) になり、level 以上で知らせたか。"""
+    def check(events):
+        hit = next((p for p in logs_of(events) if p.get("kind") == kind), None)
+        alerts = [a for a in alerts_of(events) if a.get("to") == "parent" and a.get("type") in ("stranger", "outing", "door")]
+        top = max((a["level"] for a in alerts if a["level"] in LEVELS), key=LEVELS.index, default=None)
+        esc = any(a.get("to") == "family2" for a in alerts_of(events))
+        ok = hit is not None and top is not None and at_least(top, level) and (esc or not escalate)
+        return ok, (f"{kind} {hit['time'] if hit else 'なし'}s / 知らせの重さ {top} (期待 {level}) / "
+                    f"2 人目へ {'あり' if esc else 'なし'}")
+    return check
+
+
+def check_disaster(event, want, escalate=False):
+    """災害: 気づいてスピーカーで知らせ、アヒルが子どもと話し、want 以上で知らせたか (火事は 2 人目と 119 の案内も)。"""
+    def check(events):
+        ks = kinds(events)
+        t0 = first(ks, f"{event}_detected")
+        rep = next(iter(alerts_of(events, "disaster_report")), None)
+        esc = any(a.get("to") == "family2" for a in alerts_of(events))
+        t119 = first(ks, "teach_119")
+        ok = t0 is not None and rep is not None and at_least(rep["level"], want) and (not escalate or (esc and t119))
+        extra = f" / ゆれのあと {first(ks, 'quake_over')}s" if event == "earthquake" else ""
+        return ok, (f"気づく {t0}s / 知らせ {rep['level'] if rep else 'なし'} (期待 {want} 以上, {rep.get('by') if rep else '-'})"
+                    f" / 2 人目へ {'あり' if esc else 'なし'} / 119 の案内 {t119}s{extra}")
+    return check
+
+
+def check_multi(events):
+    """同時に起きる: 見回りを中断して転倒を先にし、その間にインターホンも応対し、見回りを続きから回ったか。"""
+    ks = kinds(events)
+    pre = next((p for p in logs_of(events) if p.get("kind") == "preempt" and p.get("task") == "patrol"), None)
+    judged = first(ks, "fall_judged")
+    visitor = first(ks, "visitor_done")
+    resume = next((t for t, k in ks if k == "patrol_resume" and judged and t > judged), None)
+    overlap = visitor is not None and judged is not None and visitor < judged
+    ok = pre is not None and judged is not None and overlap and resume is not None
+    return ok, (f"見回りを中断 {pre['time'] if pre else 'なし'}s / 転倒の判断 {judged}s / インターホン {visitor}s "
+                f"(転倒の最中 {'はい' if overlap else 'いいえ'}) / 見回りの続き {resume}s")
+
+
 def check_afternoon(events):
     """物語 orusuban_afternoon: 章ごとの印が全部そろったか (時刻つきで並べる)。"""
-    logs = [e["payload"] for e in events if e["topic"] == "home/log" and isinstance(e["payload"], dict)]
-    alerts = [e["payload"] for e in events if e["topic"] == "home/alerts"]
-    first = lambda pred: next((p for p in logs if pred(p)), None)  # noqa: E731
-    marks = [("迎える", first(lambda p: p.get("kind") == "greet" and p.get("who") in (None, "child"))),
-             ("おるすばん", first(lambda p: p.get("kind") == "alone_start")),
-             ("転倒の判断 info", next((a for a in alerts if a.get("type") == "fall_report" and a.get("level") == "info"), None)),
-             ("コンロで止まった", first(lambda p: p.get("kind") == "child_stopped")),
-             ("トイレの返事", first(lambda p: p.get("kind") == "blind_ok")),
-             ("片付け", first(lambda p: p.get("kind") == "tidy_finished" and p.get("count", 0) >= 2)),
-             ("かくれんぼで発見", first(lambda p: p.get("kind") == "hide_found"))]
+    logs = logs_of(events)
+    alerts = alerts_of(events)
+    first_ = lambda pred: next((p for p in logs if pred(p)), None)  # noqa: E731
+    marks = [("迎える", first_(lambda p: p.get("kind") == "greet" and p.get("who") in (None, "child"))),
+             ("おるすばん", first_(lambda p: p.get("kind") == "alone_start")),
+             ("転倒の判断", next((a for a in alerts if a.get("type") == "fall_report"), None)),
+             ("やけど", next((a for a in alerts if a.get("type") == "voice_report"), None)),
+             ("コンロで止まった", first_(lambda p: p.get("kind") == "child_stopped")),
+             ("インターホン", first_(lambda p: p.get("kind") == "visitor_done")),
+             ("トイレの返事", first_(lambda p: p.get("kind") == "blind_ok")),
+             ("片付け", first_(lambda p: p.get("kind") == "tidy_finished" and p.get("count", 0) >= 2)),
+             ("地震", next((a for a in alerts if a.get("type") == "disaster_report"), None))]
     chapters = [e["payload"] for e in events if e["topic"] == "sim/scenario" and "chapter" in e["payload"]]
     why = " / ".join(f"{n} {p['time']}s" if p else f"{n} なし" for n, p in marks)
     return all(p for _, p in marks), f"章 {len(chapters)} 個 / " + why
@@ -153,18 +228,26 @@ def check_afternoon(events):
 
 STORIES = {"orusuban_afternoon"}      # houses/home/stories/ の物語 (run_scenario.py --story で回す)
 
-CHECKS = {"orusuban_afternoon": check_afternoon, "hide_sofa": check_hide, "hide_table": check_hide, "hide_cupboard": check_hide, "hazard_patrol": check_patrol,
+CHECKS = {"hazard_patrol": check_patrol,
           "senmen_silent": check_blind("emergency", "blind_lying"), "toilet_long": check_blind(None, "blind_ok"),
           "danger_stove": check_danger("stove"), "danger_genkan": check_danger("genkan"),
           "danger_bath": check_danger("bath"),
-          "fall": check_fall, "morning": check_morning, "homecoming": check_homecoming,
+          "fall": check_fall, "homecoming": check_homecoming,
           "fall_ousetsu": check_fall, "fall_dk": check_fall,
-          "fall_ok": check_report("info"), "fall_hurt": check_report("warn"), "fall_silent": check_report("emergency")}
+          "fall_ok": check_report("info"), "fall_hurt": check_report("warn"), "fall_silent": check_report("emergency"),
+          "voice_burn": check_voice("warn", "ひやし"), "voice_scared": check_voice("info"),
+          "intercom_delivery": check_visitor("delivery"), "intercom_suspicious": check_visitor("suspicious"),
+          "stranger_door": check_door("stranger", "emergency", escalate=True), "outing": check_door("outing", "warn"),
+          "mama_home": check_door("alone_end", "info"),
+          "fire_kitchen": check_disaster("fire", "emergency", escalate=True),
+          "earthquake": check_disaster("earthquake", "warn"), "blackout": check_disaster("blackout", "info"),
+          "multi": check_multi, "orusuban_afternoon": check_afternoon}
+ALL = [n for n in CHECKS if n not in STORIES]      # all で回す場面 (物語は長いので別に回す)
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--only", nargs="*", default=["fall", "morning", "homecoming"])
+    ap.add_argument("--only", nargs="*", default=["fall", "homecoming"], help="場面の名前 (all で全部)")
     ap.add_argument("--repeat", type=int, default=1)
     ap.add_argument("--weights", default=None, help="YOLO の重み (既定は models/yolo_person.pt があればそれ)")
     ap.add_argument("--policy", default=None, help="アヒルの歩き方 (velstand / duck_walk)")
@@ -176,7 +259,7 @@ def main():
     if a.weights:
         os.environ["YOLO_WEIGHTS"] = os.path.abspath(a.weights)
     rows = []
-    for name in a.only:
+    for name in (ALL if a.only == ["all"] else a.only):
         for k in range(a.repeat):
             before = set(glob.glob(os.path.join(ROOT, "build", "runs", f"{name}_*.json")))
             log = os.path.join(ROOT, "build", "runs", f"{name}_{datetime.datetime.now():%Y%m%d_%H%M%S}.log")

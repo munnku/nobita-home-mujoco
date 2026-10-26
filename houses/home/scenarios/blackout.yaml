@@ -1,0 +1,14 @@
+# おるすばん中に停電する。照明が消え、アヒルが子どもの所へ行って、その場で待つよう落ち着かせる
+name: blackout
+description: 停電
+mode: alone
+duration: 140
+events:
+  - {t: 0, who: mama, at: outside}
+  - {t: 0, who: child, at: ima_center, pose: stand}
+  - {t: 15, emergency: blackout}
+replies:
+  child:
+    ask_ok: [{say: "まっくらで こわいよ", delay: 1.5}, {say: "うん、ここで まってる", delay: 1.5}]
+    ask_more: {say: "でんき つかないの？", delay: 1.5}
+    default: null

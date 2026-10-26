@@ -1,0 +1,16 @@
+# おるすばん中の子どもが DK でお茶をこぼして「あつっ！」と言う。常時マイクの声を LLM が判断し、アヒルが行って冷やし方を教える
+name: voice_burn
+description: お茶をこぼしてやけど (声で気づき、手当てを教える)
+mode: alone
+duration: 150
+events:
+  - {t: 0, who: mama, at: outside}
+  - {t: 0, who: child, at: dk_table, pose: stand}
+  - {t: 15, who: child, say: "あつっ！おちゃこぼしちゃった"}
+replies:
+  child:
+    ask_ok: {say: "てがあつい…", delay: 1.5}
+    ask_more: {say: "おちゃが てに かかっちゃった", delay: 1.5}
+    ask_pain: {say: "ゆびが ひりひりする", delay: 1.5}
+    instruct: {say: "わかった、ひやすね", delay: 1.5}
+    default: null

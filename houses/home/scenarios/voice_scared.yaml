@@ -1,0 +1,15 @@
+# おるすばん中の子どもが居間で「こわいよ…」とつぶやく。アヒルが来て落ち着かせ、保護者に様子を知らせる
+name: voice_scared
+description: ひとりでこわくなる (声で気づき、落ち着かせる)
+mode: alone
+duration: 140
+events:
+  - {t: 0, who: mama, at: outside}
+  - {t: 0, who: child, at: ousetsu_sofa, pose: stand}
+  - {t: 15, who: child, say: "こわいよ…ママまだかな"}
+replies:
+  child:
+    ask_ok: {say: "うん…ひとりで さみしくなっちゃった", delay: 1.5}
+    ask_more: {say: "ママ いつ かえってくるの？", delay: 1.5}
+    comfort: {say: "うん、ありがとう", delay: 1.5}
+    default: null

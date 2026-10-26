@@ -1,0 +1,13 @@
+# おるすばん中、玄関の鍵が閉め忘れで開いていて、知らない大人が入ってくる。アヒルが見分けて声をかけ、
+# 保護者に emergency (「見た」が来ないので 2 人目の家族にも)、子どもには子ども部屋へ行くよう伝える
+name: stranger_door
+description: 不審者が玄関から入る (見分けて知らせる)
+mode: alone
+duration: 150
+events:
+  - {t: 0, who: mama, at: outside}
+  - {t: 0, who: stranger, at: outside}
+  - {t: 0, who: child, at: ima_center, pose: stand}
+  - {t: 0, door: genkan, do: unlock}          # 鍵の閉め忘れ (始めから開いている)
+  - {t: 15, door: genkan, do: open}
+  - {t: 16, who: stranger, at: genkan_in, pose: stand}

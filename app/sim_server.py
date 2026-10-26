@@ -50,7 +50,7 @@ def main():
         sc = yaml.safe_load(f)
     st = home["stretch"]["dock"] if sc.get("stretch") else None      # 片付け係の Stretch 3 は使う場面だけ置く (重い)
     w = World(a.house, duck_pose=(dock["x"] * mod, dock["y"] * mod, math.radians(dock["yaw"])),
-              n_persons=len(home["people"]), objects={k: 2 for k in OBJECT_KINDS},
+              n_persons=len(home["people"]), objects={k: (4 if k == "marble" else 1) for k in OBJECT_KINDS},
               stretch=(st["x"] * mod, st["y"] * mod, math.radians(st["yaw"])) if st else None)
     det = PersonDetector()
     hazard = HazardDetector.load()
@@ -73,9 +73,13 @@ def main():
             else:
                 rec.log(str(p))
         mq.subscribe("home/log", on_log)
+        mq.subscribe("home/tasks", lambda t, p: setattr(rec, "tasks", p) if isinstance(p, list) else None)
+        mq.subscribe("home/alerts", lambda t, p: setattr(rec, "alert", (w.time, p))
+                     if isinstance(p, dict) and p.get("level") != "checking" else None)
         mq.subscribe("home/speech", lambda t, p: rec.log(f"[{p.get('speaker')}]「{p.get('text')}」")
                      if isinstance(p, dict) and p.get("speaker") != "microduck-01" else None)
-        label = {p["name"]: p.get("label", p["name"]) for p in home["people"]}     # 録画には id でなく呼び名を出す
+        label = {p["name"]: p.get("label", p["name"]) for p in home["people"]}
+        label.update(home.get("visitors") or {})     # 録画には id でなく呼び名を出す
         mq.subscribe("home/voice", lambda t, p: rec.log(f"[{label.get(p.get('who'), p.get('who'))}]「{p.get('text')}」")
                      if isinstance(p, dict) else None)
     viewer = None

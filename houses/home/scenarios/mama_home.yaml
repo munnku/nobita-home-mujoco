@@ -1,0 +1,12 @@
+# おるすばん中にママが帰ってくる。鍵が開いたことを知らせ、アヒルがママと見分けて迎え、おるすばんモードを終える
+name: mama_home
+description: ママが帰ってくる (鍵が開く → 見分ける)
+mode: alone
+duration: 110
+events:
+  - {t: 0, who: mama, at: outside}
+  - {t: 0, who: child, at: ima_center, pose: stand}
+  - {t: 15, door: genkan, do: unlock}
+  - {t: 17, door: genkan, do: open}
+  - {t: 18, who: mama, at: genkan_in, pose: stand}
+  - {t: 22, door: genkan, do: close}

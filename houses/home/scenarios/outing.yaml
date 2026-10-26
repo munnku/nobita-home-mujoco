@@ -1,0 +1,14 @@
+# おるすばん中の子どもが、警告を聞かずに玄関の土間に下り、鍵を開けて扉を開ける (無断外出)。
+# アヒルが見に行って子どもと見分け、外に出ないよう声をかけ、保護者に warn
+name: outing
+description: 子どもがひとりで外に出ようと玄関を開ける
+mode: alone
+duration: 130
+events:
+  - {t: 0, who: mama, at: outside}
+  - {t: 0, who: child, at: rouka_mid, pose: stand}
+  - {t: 5, who: child, at: genkan_in, pose: stand, walk: true, speed: 0.8}
+  - {t: 22, door: genkan, do: unlock}
+  - {t: 23, door: genkan, do: open}
+react:
+  child: {on: none}            # 警告を聞かない

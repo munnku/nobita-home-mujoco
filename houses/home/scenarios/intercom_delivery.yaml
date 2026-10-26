@@ -1,0 +1,14 @@
+# おるすばん中に宅配便が来る。インターホンで LLM が応対し、子どもがひとりだとは言わずに置き配を頼む
+name: intercom_delivery
+description: 宅配便 (インターホンの応対)
+mode: alone
+duration: 90
+events:
+  - {t: 0, who: mama, at: outside}
+  - {t: 0, who: child, at: ima_center, pose: stand}
+  - {t: 15, intercom: ring, who: delivery, say: "こんにちはー、宅配便です"}
+replies:
+  delivery:
+    ask_who: {say: "ひよこ運輸です。お荷物のお届けにまいりました", delay: 1.5}
+    ask_more: {say: "サインをいただけますか？", delay: 1.5}
+    default: {say: "わかりました。玄関の前に置いておきますね", delay: 1.5}

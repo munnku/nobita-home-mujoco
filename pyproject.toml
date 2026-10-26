@@ -26,7 +26,6 @@ dependencies = [
     "jsonschema>=4.26.0",
     "anthropic>=1.15.0",
     "mcp>=2.3.0",
-    "sentence-transformers>=3.0",
 ]
 
 [tool.uv]

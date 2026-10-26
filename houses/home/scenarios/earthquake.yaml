@@ -1,0 +1,15 @@
+# おるすばん中に緊急地震速報。スピーカーで「机の下へ」、アヒルはゆれの間は止まり、おさまったら子どもを確かめて話す
+name: earthquake
+description: 地震 (緊急地震速報)
+mode: alone
+duration: 140
+events:
+  - {t: 0, who: mama, at: outside}
+  - {t: 0, who: child, at: ima_center, pose: stand}
+  - {t: 15, emergency: earthquake, shake: 12}
+replies:
+  child:
+    ask_ok: {say: "うん…こわかったけど、だいじょうぶ", delay: 1.5}
+    ask_pain: {say: "どこも いたくないよ", delay: 1.5}
+    ask_more: {say: "つくえの したに いたよ", delay: 1.5}
+    default: null

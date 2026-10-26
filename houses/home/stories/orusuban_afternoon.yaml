@@ -1,8 +1,10 @@
 # おるすばんの午後: 子どもが学校から帰ってきてから、ひとりで留守番する間の出来事を一続きにした物語 (動画用)。
 # 章は前の出来事 (司令塔のログの kind、または前の章が済んだこと) のあとに始まる。書き方は home/story.py。
 # ママは出かけている (家にだれもいない away から始まり、アヒルが子どもを迎えると司令塔がおるすばんモードにする)。
+# 予防 (先読み・見回り)・検知 (YOLO・常時マイク・センサー)・対応支援 (対話・インターホン)・通知 (保護者のスマホ) を順に見せる。
+# 分かれ道の別の場合 (返事がない・不審者が入る・火事など) は、場面 (scenarios/) を別に録る。
 name: orusuban_afternoon
-description: 帰宅 → 転ぶ → コンロ → トイレ → 見回りと片付け → かくれんぼ
+description: 帰宅 → 転ぶ → やけど → コンロ → インターホン → トイレ → 見回りと片付け (宅配が重なる) → 地震
 mode: away
 stretch: true
 start_clock: "15:00:00"
@@ -10,7 +12,8 @@ duration: 2400
 events:
   - {t: 0, who: mama, at: outside}
   - {t: 0, who: child, at: outside}
-  - {t: 0.5, mqtt: home/patrol/config, payload: {every: 0}}   # 見回りは章 7 でママのアプリから頼むときだけ
+  - {t: 0, who: stranger, at: outside}
+  - {t: 0.5, mqtt: home/patrol/config, payload: {every: 0}}   # 見回りは章 9 でママのアプリから頼むときだけ
 
 chapters:
   - title: "1. ただいま"
@@ -37,18 +40,32 @@ chapters:
     events:
       - {t: 0, who: child, at: ima_fall, pose: stand, walk: true, speed: 0.6}
       - {t: 5, who: child, at: ima_fall, pose: lie}
-      - {t: 5.5, who: child, say: "いたっ！"}
+      - {t: 5.5, who: child, say: "いたっ！"}         # 常時マイク → LLM が「痛がっている」と判断
       - {t: 70, who: child, stand_up: true}         # アヒルが来なくても、そのうち自分で起き上がる (横になっていれば)
     replies:
       child:
         ask_ok: {say: "いてて…ころんじゃった。でもへーきだよ", delay: 2.0, then: {pose: stand}}
-        ask_ok_again: {say: "うん、へーき", delay: 1.5, then: {pose: stand}}
+        ask_more: {say: "ころんで ひざを ぶつけたけど、もう へいき", delay: 1.5, then: {pose: stand}}
         ask_pain: {say: "ううん、どこもいたくない", delay: 1.5}
         default: null
 
-  - title: "4. コンロに近づく"
+  - title: "4. お茶でやけど"
     start_after: {kind: fall_judged, delay: 8}
     max_wait: 120
+    events:
+      # 居間のちゃぶ台でお茶を飲んでいてこぼす (DK の食卓へ歩くと、コンロへ向かうと先読みされて警告が重なる)
+      - {t: 4, who: child, say: "あつっ！おちゃこぼしちゃった"}
+    replies:
+      child:
+        ask_ok: {say: "てがあつい…", delay: 1.5}
+        ask_more: {say: "おちゃが てに かかっちゃった", delay: 1.5}
+        ask_pain: {say: "ゆびが ひりひりする", delay: 1.5}
+        instruct: {say: "わかった、ひやすね", delay: 1.5}
+        default: null
+
+  - title: "5. コンロに近づく"
+    start_after: {kind: voice_judged, delay: 10}
+    max_wait: 180
     events:
       - {t: 0, who: child, say: "おなかすいた。なにか作ろうかな"}
       - {t: 2, who: child, at: dk_stove, pose: stand, walk: true, speed: 0.6}
@@ -59,12 +76,26 @@ chapters:
         warn: [{say: "はーい、ごめんなさい", delay: 1.0}, null]
         default: null
 
-  - title: "5. トイレ"
+  - title: "6. インターホン"
     start_after: {kind: child_stopped, delay: 6}
     max_wait: 90
     events:
-      - {t: 0, who: child, at: toilet_door, pose: stand, walk: true, speed: 0.6}
+      - {t: 0, who: child, at: ima_center, pose: stand, walk: true, speed: 0.6}
+      - {t: 6, intercom: ring, who: visitor, say: "すみませーん"}
     react: {}
+    replies:
+      child:
+        default: null
+      visitor:
+        ask_who: {say: "お母さんの ともだちなんだけど、お母さんいる？ちょっと開けてくれるかな", delay: 1.5}
+        ask_more: {say: "いいから、ちょっと開けてよ。きみ、ひとりなの？", delay: 1.5}
+        default: {say: "…そう。またくるね", delay: 1.5}
+
+  - title: "7. トイレ"
+    start_after: {kind: visitor_done, delay: 10}
+    max_wait: 120
+    events:
+      - {t: 0, who: child, at: toilet_door, pose: stand, walk: true, speed: 0.6}
 
   - start_after: {done: true, delay: 1}             # トイレに入る (題なし)
     events:
@@ -76,7 +107,7 @@ chapters:
         ask_ok: {say: "いまトイレー！もうすぐでるよ", delay: 1.5}
         default: null
 
-  - title: "6. トイレから応接室へ"
+  - title: "8. トイレから応接室へ"
     start_after: {kind: blind_ok, delay: 15}       # アヒルが扉の前を離れてから
     max_wait: 200
     events:
@@ -86,29 +117,32 @@ chapters:
       # 応接室のソファで本を読む (居間の真ん中にいると、Stretch が居間の南の物へ行く道をふさぐ)
       - {t: 3, who: child, at: ousetsu_sofa, pose: stand, walk: true, speed: 0.6}
 
-  - title: "7. 見回りと片付け"
+  - title: "9. 見回りと片付け (宅配が重なる)"
     start_after: {done: true, delay: 5}
     events:
-      # 子どもが遊んで散らかした想定。子どもとロボットの通り道から外した所に置く
-      - {t: 0, objects: [{kind: button_battery, at: [6.4, 0.6]}, {kind: marble, at: [2.3, 1.6]},
-                         {kind: coin, at: [7.1, 5.5], yaw: 30}]}
-      - {t: 2, who: child, say: "あーあ、おもちゃちらかしちゃった"}
+      # 子どもが遊んで散らかしたビー玉。子どもとロボットの通り道から外した所に置く
+      - {t: 0, objects: [{kind: marble, at: [6.4, 0.6]}, {kind: marble, at: [2.3, 1.6]}, {kind: marble, at: [7.1, 5.5]}]}
+      - {t: 2, who: child, say: "あーあ、ビーだま ちらかしちゃった"}
       - {t: 4, mqtt: home/patrol/request, payload: {by: mama-app}}   # ママが外出先のアプリで見回りを頼む
+      - {t: 60, intercom: ring, who: delivery, say: "こんにちはー、宅配便です"}   # 見回りと同時に応対 (タスク一覧に 2 つ)
     replies:
       child:
         warn: {say: "はーい", delay: 1.0}
         default: null
+      delivery:
+        ask_who: {say: "ひよこ運輸です。お荷物のお届けにまいりました", delay: 1.5}
+        default: {say: "わかりました。玄関の前に置いておきますね", delay: 1.5}
 
-  - title: "8. かくれんぼ"
+  - title: "10. 地震"
     start_after: {kind: tidy_finished, delay: 8}
     max_wait: 900
     events:
-      - {t: 0, who: child, say: "ねえアヒル、かくれんぼしよう！アヒルが鬼ね！"}
-      - {t: 3, who: child, at: hide_cupboard, pose: stand, walk: true, speed: 1.0}   # 応接室から DK まで約 10 m
+      - {t: 0, emergency: earthquake, shake: 12}
     replies:
       child:
-        hide_ready: {say: "もういいよー！", delay: 1.0}
-        hide_found: {say: "あーあ、みつかっちゃった！", delay: 1.0, then: {pose: stand}}
+        ask_ok: {say: "うん…こわかったけど、だいじょうぶ", delay: 1.5}
+        ask_pain: {say: "どこも いたくないよ", delay: 1.5}
+        ask_more: {say: "ソファの よこで しゃがんでた", delay: 1.5}
         default: null
 
-end_after: {kind: hide_found, delay: 15}
+end_after: {kind: disaster_judged, delay: 15}

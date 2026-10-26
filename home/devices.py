@@ -6,6 +6,10 @@
 - スマートロック: 玄関と勝手口。locked を /set で切り替える。扉の開閉センサー (open) も出す
 - 見守りカメラのマイク: 同じ部屋の人の声 (home/voice) を audio/heard に出す (声は文字で表す)
 - 扉の開閉センサー: 鍵の無い扉 (脱衣所・トイレなど) が開いているか (contact/open)
+- インターホン (intercom-genkan): ring (鳴った)、heard (子機のマイクが聞いた訪問者の声)、say (子機のスピーカーで話す)
+- 煙センサー (smoke-dk): 台所の煙 (smoke/detected)。場面の台本で煙を出す (火事の見た目は作らない)
+- 停電: 場面の台本で power(False) にすると照明が全部消え、つけられなくなる。家の知らせ (home/emergency) にも出す
+  (見守りカメラ・スピーカー・センサー・アヒルは電池で動き続けるとする)
 - 片付け係の Stretch は背が高く人に見えることがあるので、位置 (VDA 5050 の state) から絵に投影した範囲の検出は人にしない
 MQTT からの書き込みは受信スレッドで来るので、キューにためてシミュレーションのスレッドで反映する。
 """
@@ -94,6 +98,21 @@ class HomeDevices:
                      "open": {"name": "開いている", "datatype": "boolean"}}}},
                 on_set=lambda n, p, v, door=name: self.pending.put(("lock", door, v)))
             self.locks[name].set("lock", "locked", True)
+        # インターホン (玄関の子機)
+        self.intercom = HomieDevice(mqtt, "intercom-genkan", "インターホン (玄関)", {
+            "intercom": {"name": "インターホン", "type": "intercom", "properties": {
+                "ring": {"name": "鳴った", "datatype": "boolean"},
+                "heard": {"name": "子機のマイクが聞いた声 (だれ・文)", "datatype": "string", "format": "json"},
+                "say": {"name": "子機で話す", "datatype": "string", "settable": True}}}},
+            on_set=lambda n, p, v: self.pending.put(("intercom_say", None, v)))
+        # 煙センサー
+        self.smoke = {}
+        for name in ("dk",):
+            self.smoke[name] = HomieDevice(mqtt, _dev_id("smoke", name), f"煙センサー ({rooms[name]['label']})", {
+                "smoke": {"name": "煙", "type": "smoke", "properties": {
+                    "detected": {"name": "煙を検知", "datatype": "boolean"}}}})
+            self.smoke[name].set("smoke", "detected", False)
+        self.powered = True
         # 扉の開閉センサー (鍵の無い扉)
         self.doors = {}
         for name, d in world.layout["doors"].items():
@@ -108,7 +127,7 @@ class HomeDevices:
         while not self.pending.empty():
             kind, name, value = self.pending.get()
             if kind == "light":
-                self.w.set_light(name, bool(value))
+                self.w.set_light(name, bool(value) and self.powered)      # 停電中はつかない
             elif kind == "say":
                 # 値は文か {"text", "intent"} (intent は問いかけ・警告の種類。人役の反応に使う)
                 text, intent = (value.get("text", ""), value.get("intent")) if isinstance(value, dict) else (value, None)
@@ -118,6 +137,16 @@ class HomeDevices:
                     msg["intent"] = intent
                 self.m.publish("home/speech", msg)
                 self.speakers[name].set("speaker", "say", str(text), force=True)
+            elif kind == "intercom_say":
+                text, intent = (value.get("text", ""), value.get("intent")) if isinstance(value, dict) else (value, None)
+                msg = {"speaker": "intercom-genkan", "text": str(text), "room": "intercom", "time": round(self.w.time, 1),
+                       "duration": round(1.0 + 0.12 * len(str(text)), 1)}
+                if intent:
+                    msg["intent"] = intent
+                self.m.publish("home/speech", msg)
+                self.intercom.set("intercom", "say", str(text), force=True)
+            elif kind == "voice" and value.get("room") == "intercom":
+                self.intercom.set("intercom", "heard", value, force=True)
             elif kind == "voice":
                 for c in self.cam_cfg["cameras"]:
                     if c["room"] == value.get("room"):
@@ -133,6 +162,24 @@ class HomeDevices:
         if t >= self.next_cam_t:
             self.next_cam_t = t + 1.0 / self.cam_cfg.get("rate", 1.0)
             self._cameras()
+
+    # ---- 場面の台本から
+    def ring(self):
+        """インターホンが鳴る。"""
+        self.intercom.set("intercom", "ring", True, force=True)
+        self.intercom.set("intercom", "ring", False)
+
+    def set_smoke(self, room, on):
+        self.smoke[room].set("smoke", "detected", bool(on), force=True)
+
+    def power(self, on):
+        """停電 (on=False) と復旧。停電のあいだ照明は全部消える。"""
+        self.powered = bool(on)
+        if not on:
+            for name in self.lights:
+                self.w.set_light(name, False)
+        self.m.publish("home/emergency", {"type": "blackout" if not on else "power_restored", "source": "家の電源",
+                                          "time": round(self.w.time, 1)})
 
     def try_open_door(self, name):
         """人役が扉を開ける (鍵がかかっていれば開かない)。"""

@@ -69,7 +69,7 @@ class Patrol(Rule):
         else:
             c.log(f"中断した見回りの続き (残り {len(pts)} か所)", kind="patrol_resume")
         self.todo = list(pts)
-        job = Job("patrol", 2)
+        job = Job("patrol", 4)
         job.interruptible = True
         for p in pts:
             x, y = p[0] * M, p[1] * M
@@ -101,10 +101,8 @@ class Patrol(Rule):
             c.log(f"{where}の床に{what}を見つけた ({o['x']:.2f}, {o['y']:.2f}、score {o['score']:.2f})",
                   kind="hazard_found", hazard=o["kind"], room=room, x=o["x"], y=o["y"])
             todo = "片付けロボットが片付けます。" if self.has_stretch else "小さい子が口に入れると危ないので、片付けてください。"
-            c.m.publish("home/alerts", {"type": "small_object", "level": "info", "room": room, "object": o["kind"],
-                                        "x": o["x"], "y": o["y"], "time": round(c.time, 1),
-                                        "summary": f"{where}の床に{what}が落ちています。{todo}",
-                                        "evidence": o.get("image")}, qos=1)
+            c.notify("small_object", "info", f"{where}の床に{what}が落ちています。{todo}", room=room, category="予防",
+                     object=o["kind"], x=o["x"], y=o["y"], evidence=o.get("image"))
             child = self._child_near(o)
             if child:
                 if child in ("ima", "dk", "rouka", "kodomo"):        # スピーカーのある部屋
@@ -157,6 +155,7 @@ class Patrol(Rule):
                 todo["state"] = "tidying"
                 what, where = KIND_LABEL.get(todo["kind"], todo["kind"]), LABEL.get(todo["room"], todo["room"])
                 c.log(f"片付け係 (Stretch 3) に{where}の{what}を拾ってもらう", kind="tidy_start", hazard=todo["kind"])
+                c.tasks.show("tidy", f"片付け (Stretch 3): {where}の{what}", "予防")
                 self._send(todo, "pick")
             return
         t = self.tidy
@@ -180,9 +179,8 @@ class Patrol(Rule):
         elif st["actionStatus"] == "FINISHED":
             obj["state"] = "picked"
             c.log(f"{where}の{what}を片付けた", kind="tidy_done", hazard=obj["kind"])
-            c.m.publish("home/alerts", {"type": "small_object_removed", "level": "info", "room": obj["room"],
-                                        "object": obj["kind"], "time": round(c.time, 1),
-                                        "summary": f"{where}の床に落ちていた{what}を、片付けロボットが箱に片付けました。"}, qos=1)
+            c.notify("small_object_removed", "info", f"{where}の床に落ちていた{what}を、片付けロボットが箱に片付けました。",
+                     room=obj["room"], category="予防", object=obj["kind"])
             self._after(obj)
         elif t["stage"] == "pick" and obj.get("tries", 0) < PICK_RETRY and st.get("resultDescription") != "時間切れ":
             obj["tries"] = obj.get("tries", 0) + 1         # 拾えなかった: 台車の位置から合わせ直して、もう一度だけ
@@ -192,9 +190,8 @@ class Patrol(Rule):
             obj["state"] = "failed"
             c.log(f"{what}を片付けられなかった ({st.get('resultDescription')}) → 保護者に頼む", kind="tidy_failed",
                   hazard=obj["kind"])
-            c.m.publish("home/alerts", {"type": "small_object", "level": "warn", "room": obj["room"],
-                                        "object": obj["kind"], "time": round(c.time, 1),
-                                        "summary": f"{where}の床の{what}を片付けロボットが拾えませんでした。片付けてください。"}, qos=1)
+            c.notify("small_object", "warn", f"{where}の床の{what}を片付けロボットが拾えませんでした。片付けてください。",
+                     room=obj["room"], category="予防", object=obj["kind"])
             self._after(obj)
         c.m.publish("home/hazards", [f for f in self.found if f["state"] in ("found", "tidying")], retain=True)
 
@@ -206,6 +203,7 @@ class Patrol(Rule):
             done = sum(1 for f in self.found if f["state"] == "picked")
             self.c.log(f"片付けが終わった (箱に入れた物: {done} 個) → Stretch は待機場所へ戻る", kind="tidy_finished",
                        count=done)
+            self.c.tasks.show("tidy", None)
             self._send(obj, "home")
 
     def _at_feet(self, o):

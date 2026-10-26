@@ -10,6 +10,8 @@
         default: null                                                                   # 書いていない問いは無言
   null は無言。リストなら n 回目の問いに n 番目を使う (足りなければ最後のもの)。then: {pose} で返事のあとに姿勢を変える。
 - 台本のイベントの {t, who, say: "いたっ"} は、その時刻に人役が自分から声を出す (Scenario から say() を呼ぶ)。
+- 訪問者 (インターホンを鳴らした人、at_door) は体を持たず、インターホンの子機の声 (speaker intercom-genkan) だけが聞こえる。
+  返事は同じく replies の台本 (訪問者の名前) で、声は home/voice に room "intercom" で出す (子機のマイクが聞く)。
 声は文字で表す (音声認識・音声合成の代わり)。home/voice を聞くのは、アヒルのマイク (VDA 5050 の listen) と
 見守りカメラのマイク (Homie の audio ノード)。
 """
@@ -29,6 +31,7 @@ class Voices:
         self.pending = []                   # [(時刻, 名前, 返事)]
         self.inbox = queue.Queue()
         self.on_intent = on_intent          # 問いかけ・警告が聞こえたとき (人の番号, intent) を渡す (場面の反応)
+        self.at_door = set()                # インターホンの前にいる訪問者の名前
         mqtt.subscribe("home/speech", lambda t, p: self.inbox.put(p) if isinstance(p, dict) else None)
 
     def _where(self, i):
@@ -55,27 +58,30 @@ class Voices:
             intent = sp.get("intent")
             if not intent:
                 continue
+            if sp.get("speaker") == "intercom-genkan":
+                for name in self.at_door:
+                    r = self._reply(name, intent)
+                    if r:
+                        self.pending.append((self.w.time + float(sp.get("duration", 0.0)) + float(r.get("delay", 1.5)),
+                                             name, r))
+                continue
             for i, name in self.names.items():
                 if not self.hears(i, sp):
                     continue
                 if self.on_intent:
                     self.on_intent(i, intent)
-                table = self.replies.get(name)
-                if table is None:
-                    continue
-                n = self.asked.get((name, intent), 0)
-                self.asked[(name, intent)] = n + 1
-                r = table.get(intent, table.get("default"))
-                if isinstance(r, list):
-                    r = r[min(n, len(r) - 1)] if r else None
+                r = self._reply(name, intent)
                 if r is None:
-                    print(f"[voice] t={self.w.time:.1f} {name}: (無言) ← {intent}", flush=True)
                     continue
                 # 返事は話し終わってから delay 秒後
                 self.pending.append((self.w.time + float(sp.get("duration", 0.0)) + float(r.get("delay", 1.5)), i, r))
         for item in [p for p in self.pending if p[0] <= self.w.time]:
             self.pending.remove(item)
             _, i, r = item
+            if isinstance(i, str):              # 訪問者 (名前)
+                if r.get("say"):
+                    self.visitor_say(i, r["say"])
+                continue
             if r.get("say"):
                 self.say(i, r["say"])
             then = r.get("then") or {}
@@ -86,6 +92,25 @@ class Voices:
                     self.m.publish("sim/scenario", {"time": round(self.w.time, 1), "who": self.names[i],
                                                     "at": "here", "pose": then["pose"]})
                     print(f"[voice] t={self.w.time:.1f} {self.names[i]} -> {then['pose']}", flush=True)
+
+    def _reply(self, name, intent):
+        """台本の返事 (無言なら None)。"""
+        table = self.replies.get(name)
+        if table is None:
+            return None
+        n = self.asked.get((name, intent), 0)
+        self.asked[(name, intent)] = n + 1
+        r = table.get(intent, table.get("default"))
+        if isinstance(r, list):
+            r = r[min(n, len(r) - 1)] if r else None
+        if r is None:
+            print(f"[voice] t={self.w.time:.1f} {name}: (無言) ← {intent}", flush=True)
+        return r
+
+    def visitor_say(self, name, text):
+        self.m.publish("home/voice", {"who": name, "text": text, "room": "intercom", "level": "outside",
+                                      "time": round(self.w.time, 1)})
+        print(f"[voice] t={self.w.time:.1f} {name} (インターホン)「{text}」", flush=True)
 
     def say(self, i, text):
         where = self._where(i)

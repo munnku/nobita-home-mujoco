@@ -1,0 +1,24 @@
+# いくつも同時に起きる: 見回りの最中に、子どもが転んで「いたっ！」と言い、ほぼ同時にインターホンが鳴る。
+# タスク一覧で転倒を先にし (見回りを中断)、インターホンは別の受け持ちで同時に応対し、見回りはあとで続きから回る
+name: multi
+description: 見回り中に転倒とインターホンが重なる
+mode: alone
+duration: 420
+events:
+  - {t: 0, who: mama, at: outside}
+  - {t: 0, who: child, at: ousetsu_sofa, pose: stand}
+  - {t: 2, mqtt: home/patrol/request, payload: {by: mama-app}}
+  - {t: 40, who: child, at: ima_center, pose: stand, walk: true, speed: 0.6}
+  - {t: 60, who: child, at: ima_fall, pose: lie}
+  - {t: 60.5, who: child, say: "いたっ！"}
+  - {t: 62, intercom: ring, who: delivery, say: "こんにちはー、宅配便です"}
+objects:
+  - {kind: marble, at: [2.3, 1.6]}
+replies:
+  child:
+    ask_ok: {say: "いてて…ころんじゃった。でもへーきだよ", delay: 2.0, then: {pose: stand}}
+    ask_pain: {say: "ううん、どこもいたくない", delay: 1.5}
+    default: null
+  delivery:
+    ask_who: {say: "ひよこ運輸です。お荷物のお届けにまいりました", delay: 1.5}
+    default: {say: "わかりました。玄関の前に置いておきますね", delay: 1.5}

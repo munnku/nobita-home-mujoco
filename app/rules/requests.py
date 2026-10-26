@@ -41,6 +41,7 @@ class Requests(Rule):
                 acts = [action("detectObject", "x-detect", objectType="person", sweep="full", duration=12.0)] \
                     if kind == "checkRoom" else []
                 job = Job(kind, 3).go(x, y, 0.6, acts)
+                job.interruptible = True
                 job.room = room
                 job.then(reply)
                 c.add_job(job)

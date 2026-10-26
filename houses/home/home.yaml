@@ -9,6 +9,8 @@ people:
   - {name: mama, label: ママ, look: adult}
   - {name: child, label: 子ども, look: child}
   - {name: stranger, label: 知らない人, look: stranger}   # 不審者 (ふだんは家の外)
+# インターホンの訪問者 (体を持たず、子機の声だけ。場面の台本の {intercom: ring, who}) と録画のログの呼び名
+visitors: {delivery: 宅配の人, visitor: 訪問者}
 # 人役を置く場所 (足元の位置と顔の向き)
 places:
   dk_kitchen: {x: 1.2, y: 2.6, yaw: 180, level: 1F}     # 流し台の前
@@ -35,14 +37,8 @@ places:
   hide_table: {x: 2.27, y: 2.4, yaw: 90, level: 1F}    # かくれんぼ: DK の食卓の下にもぐる
   hide_cupboard: {x: 3.15, y: 2.15, yaw: 0, level: 1F}  # かくれんぼ: DK の食器棚の西に立つ
 
-# 起こす (起床の見守り)
-wake_up:
-  who: child
-  time: "07:00:00"
-  room: kodomo
-  bed: [5.6, 8.3, 1.4, 2.8]              # 布団のあたり [xmin, xmax, ymin, ymax] (マス)
-  call_point: {x: 7.4, y: 4.6}           # アヒルが 2 階へ呼びかける場所 (階段の下)
-  retry_after: 30                        # 起きなければこの秒数後にもう一度、そのあとママに知らせる
+# 布団 (ここで横になっているのは寝ているので転倒としない)。rect [xmin, xmax, ymin, ymax] (マス)
+bed: {room: kodomo, rect: [5.6, 8.3, 1.4, 2.8]}
 
 # 玄関
 entrance:
