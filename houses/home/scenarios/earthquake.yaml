@@ -11,5 +11,7 @@ replies:
   child:
     ask_ok: {say: "うん…こわかったけど、だいじょうぶ", delay: 1.5}
     ask_pain: {say: "どこも いたくないよ", delay: 1.5}
-    ask_more: {say: "つくえの したに いたよ", delay: 1.5}
+    ask_more: [{say: "つくえの したに いたよ", delay: 1.5}, {say: "うん、もう だいじょうぶ", delay: 1.5}]
+    instruct: {say: "わかった", delay: 1.5}
+    comfort: {say: "うん", delay: 1.0}
     default: null

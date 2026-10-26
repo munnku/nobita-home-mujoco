@@ -51,7 +51,8 @@ class Dialogue:
         d = ev["dialog"]
         if d and "child" in d[-1] and "label" not in d[-1]:
             d[-1]["label"] = res.get("reply_label")
-            ev["replies"].append({"asked": d[-1]["robot"], "text": d[-1]["child"], "label": d[-1]["label"]})
+            ev["replies"].append({"asked": d[-1]["robot"], "intent": d[-1].get("intent"), "text": d[-1]["child"],
+                                 "label": d[-1]["label"]})
             text = d[-1]["child"]
             c.log((f"返事: 「{text}」→ {d[-1]['label']}" if text else "返事がない") + f" ({res.get('by')})",
                   kind="reply", label=d[-1]["label"], by=res.get("by"))

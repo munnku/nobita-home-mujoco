@@ -47,7 +47,11 @@ class Recorder:
         """しばらくその部屋の見守りカメラを出す (司令塔が部屋のことを知らせたとき)。"""
         self.focus_room, self.focus_until = room, self.w.time + seconds
 
+    QUIET = ("仕事を始める", "仕事が終わった", "タスクに足した")    # タスク一覧の欄に出ているので記録の欄には出さない
+
     def log(self, text):
+        if text.startswith(self.QUIET):
+            return
         line = f"[{self.w.time:4.0f}s] "
         for ch in text:                       # 右の欄の幅 (全角 26 字ほど) で折り返す
             if len(line) >= 30:
@@ -100,8 +104,13 @@ class Recorder:
         d.text((808, 274), "頭のカメラ", font=self.font_small, fill=(255, 255, 255))
         self._overlay(img, d)
         if agent and agent.speech:
-            d.rectangle([810, 500, 1270, 536], fill=(255, 255, 220))
-            d.text((818, 506), f"アヒル「{agent.speech[1]}」", font=self.font_small, fill=(0, 0, 0))
+            # 吹き出し: 26 字ごとに折り返し、下 (頭のカメラの下端) から上へ伸ばす (最大 3 行)
+            text = f"アヒル「{agent.speech[1]}」"
+            rows = [text[k:k + 26] for k in range(0, len(text), 26)][:3]
+            top = 536 - 6 - 20 * len(rows)
+            d.rectangle([810, top, 1270, 536], fill=(255, 255, 220))
+            for k, row in enumerate(rows):
+                d.text((818, top + 4 + 20 * k), row, font=self.font_small, fill=(0, 0, 0))
         for k, line in enumerate(self.lines):
             d.text((808, 546 + k * 19), line, font=self.font_small, fill=(230, 230, 230))
         self.vw.write(np.asarray(img)[..., ::-1])

@@ -1,36 +1,46 @@
 # 「おるすばんの午後」の録画を切り分ける (app/cut_clips.py)。動画は 3 分以内にするので、場面ごとのファイルに分ける。
 # from / to は出来事の印: 司令塔のログの kind (#n で n 回目)、door:<扉>:<操作>。後ろに +秒 / -秒 を付けてずらす。
 # speed は勧める倍速 (編集で掛ける)。要所は 1 倍、ただ歩くところや待つところは速くする。印の間で切らないところは捨てる。
+# LLM (Claude Pro の claude -p) が考える間 (1 回 10 秒ほど) は止まって見えるので、対話の場面は 1.5〜2 倍を勧める。
 clips:
   - {name: 帰宅, from: "door:genkan:unlock-2", to: "door_open+2.5", speed: 1,
      note: 子どもが鍵を開けて入り「ただいまー！」}
   - {name: アヒルが玄関へ, from: "door_open+2.5", to: "greet-1", speed: 3}
   - {name: 見分けて出迎え, from: "greet-1", to: "greet+6", speed: 1,
-     note: 頭のカメラで子どもと見分けて「おかえり！」、おるすばんモードへ}
-  - {name: 居間へ, from: "greet+6", to: "distress_voice-1.5", speed: 2, note: 鍵の閉め忘れを自動で施錠}
-  - {name: 転ぶ, from: "distress_voice-1.5", to: "fall_suspected+2", speed: 1,
-     note: 「いたっ！」、見守りカメラで転倒を疑う}
+     note: 頭のカメラ (YOLO) で子どもと見分けて「おかえり！」、おるすばんモードへ (保護者に知らせ)}
+  - {name: 居間へ, from: "greet+6", to: "fall_suspected-4", speed: 3, note: 鍵の閉め忘れを自動で施錠}
+  - {name: 転ぶ, from: "fall_suspected-4", to: "fall_suspected+2", speed: 1,
+     note: 「いたっ！」、見守りカメラの YOLO で転倒を疑う (検知)}
   - {name: アヒルが向かう, from: "fall_suspected+2", to: "fall_confirmed-1", speed: 3}
-  - {name: 確かめて話す, from: "fall_confirmed-1", to: "fall_judged+2", speed: 1,
-     note: 目で確かめて「だいじょうぶ？」、返事を聞いて info と判断}
-  - {name: コンロへ, from: "fall_judged+2", to: "predict_hazard-3", speed: 3, note: 先読みで備え始める}
+  - {name: 確かめて話す, squeeze: true, from: "fall_confirmed-1", to: "fall_judged+2", speed: 2,
+     note: 目で確かめて、LLM が安否を聞き、返事と様子から重さを決めて保護者へ (対応支援 → 通知)}
+  - {name: お茶をこぼす, squeeze: true, from: "fall_judged+9", to: "voice_go+1", speed: 2,
+     note: 「あつっ！」を常時マイクが聞き、LLM が「行くべき声」と判断 (検知)}
+  - {name: 冷やし方を教える, squeeze: true, from: "voice_go+1", to: "voice_judged+2", speed: 2,
+     note: LLM が「水で冷やしてね」と手当てを教え、保護者に warn}
+  - {name: コンロへ, from: "voice_judged+10", to: "predict_hazard-3", speed: 3, note: 先読みで備え始める (予防)}
   - {name: 先読みで警告, from: "predict_hazard-3", to: "child_stopped+2", speed: 1,
      note: コンロに向かうと先読みしてスピーカーで警告、子どもが止まる}
-  - {name: トイレへ, from: "child_stopped+2", to: "door:toilet:close+1", speed: 2}
-  - {name: トイレで待つ, from: "door:toilet:close+1", to: "blind_check", speed: 20, note: 60 秒出てこない}
-  - {name: 扉の前へ, from: "blind_check", to: "blind_ok-7", speed: 4}
-  - {name: トイレに声かけ, from: "blind_ok-7", to: "blind_ok+2", speed: 1,
+  - {name: 怪しい訪問者, squeeze: true, from: "intercom_ring-1", to: "visitor_done+3", speed: 2,
+     note: インターホンで LLM が家の人の代わりに断る (ひとりとは言わない)、保護者に warn、子どもに「出なくていいよ」}
+  - {name: トイレへ, from: "visitor_done+3", to: "door:toilet:close+1", speed: 4}
+  - {name: トイレで待つ, from: "door:toilet:close+1", to: "blind_check", speed: 20, note: 60 秒出てこない (人感センサー)}
+  - {name: 扉の前へ, from: "blind_check", to: "blind_ok-16", speed: 4}
+  - {name: トイレに声かけ, squeeze: true, from: "blind_ok-16", to: "blind_ok+2", speed: 1.5,
      note: カメラの無い場所なので声で確かめる}
-  - {name: 応接室へ, from: "door:toilet:open#2-1", to: "patrol_start+2", speed: 3,
-     note: 床におもちゃなどを散らかす、ママのアプリから見回りの依頼}
+  - {name: 応接室へ, from: "door:toilet:open#2-1", to: "patrol_start+2", speed: 4,
+     note: ビー玉を散らかす、ママのアプリから見回りの依頼}
   - {name: 見回り, from: "patrol_start+2", to: "hazard_found#1-3", speed: 8}
-  - {name: 見つける, from: "hazard_found#1-3", to: "hazard_found#1+3", speed: 1,
-     note: 頭のカメラで床のボタン電池を見つける}
-  - {name: 見回りの続き, from: "hazard_found#1+3", to: "patrol_done+2", speed: 16, note: 硬貨とビー玉も見つける}
+  - {name: 見つける, from: "hazard_found#1-3", to: "hazard_found#1+3", speed: 1.5,
+     note: 頭のカメラ (YOLO) で床のビー玉を見つける (予防)}
+  - {name: 見回りの続き, from: "hazard_found#1+3", to: "intercom_ring#2-2", speed: 8}
+  - {name: 見回り中に宅配, squeeze: true, from: "intercom_ring#2-2", to: "visitor_done#2+2", speed: 2.5,
+     note: タスク一覧に「インターホンの応対」と「見回り」が並び、同時に進む。置き配を頼む}
+  - {name: 見回りの終わり, from: "visitor_done#2+2", to: "patrol_done+2", speed: 24}
   - {name: 片付けへ, from: "patrol_done+2", to: "tidy_picked#1-10", speed: 12}
-  - {name: Stretchが拾う, from: "tidy_picked#1-10", to: "tidy_picked#1+2", speed: 1}
+  - {name: Stretchが拾う, from: "tidy_picked#1-10", to: "tidy_picked#1+2", speed: 2}
   - {name: 片付けの続き, from: "tidy_picked#1+2", to: "tidy_finished+2", speed: 24, note: 箱に入れる、残り 2 個も片付ける}
-  - {name: かくれんぼしよう, from: "hide_start-1", to: "hide_start+4", speed: 1}
-  - {name: 10数える, from: "hide_start+4", to: "hide_skip-3", speed: 2}
-  - {name: 探す, from: "hide_skip-3", to: "hide_found-3", speed: 6, note: 隠れていそうな所を順に探す}
-  - {name: みーつけた, from: "hide_found-3", to: "hide_found+6", speed: 1}
+  - {name: 地震, from: "earthquake_detected-1", to: "quake_over+1", speed: 2,
+     note: 緊急地震速報、スピーカーで「机の下へ」。アヒルはゆれの間は止まって待つ}
+  - {name: 子どもを確かめる, squeeze: true, from: "quake_over+1", to: "disaster_judged+6", speed: 2.5,
+     note: アヒルが子どもの所へ行き、LLM が無事か聞いて、保護者に知らせる}

@@ -12,4 +12,6 @@ replies:
   child:
     ask_ok: {say: "うぅ…いたいよぉ", delay: 2.0}
     ask_pain: {say: "ひざをすりむいて、ちがでてる", delay: 2.0, then: {pose: stand}}
+    ask_more: {say: "ひざから ちが でてる…", delay: 1.5}
+    instruct: [{say: "わかった、あらってくる", delay: 1.5}, {say: "うん、おさえてる", delay: 1.5}]
     default: null

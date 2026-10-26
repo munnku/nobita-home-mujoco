@@ -11,4 +11,6 @@ replies:
   child:
     ask_ok: [{say: "まっくらで こわいよ", delay: 1.5}, {say: "うん、ここで まってる", delay: 1.5}]
     ask_more: {say: "でんき つかないの？", delay: 1.5}
+    instruct: {say: "わかった、ここで まってる", delay: 1.5}
+    comfort: {say: "うん", delay: 1.0}
     default: null

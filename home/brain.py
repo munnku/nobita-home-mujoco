@@ -29,7 +29,7 @@ LEVELS = ("info", "warn", "emergency")
 HEAR_MODEL = os.environ.get("BRAIN_HEAR_MODEL", "claude-haiku-5-5")     # 速さ優先 (声のたびに呼ぶ)
 TALK_MODEL = os.environ.get("BRAIN_TALK_MODEL", "claude-sonnet-5-5")    # 対話と重さ
 INTENTS = ("ask_ok", "ask_pain", "ask_more", "instruct", "comfort", "ask_who", "close")
-MAX_TURNS = {"blind": 2, "visitor": 3}    # 種類ごとの問いかけの回数の上限 (無ければ 4)
+MAX_TURNS = {"blind": 2, "visitor": 3}    # 種類ごとの問いかけの回数の上限 (無ければ 3)
 # インターホンで言ってはいけない言葉 (子どもがひとり・留守番中だと分かる言葉)。LLM が言っても規則の文に替える
 VISITOR_FORBID = re.compile(r"(ひとり|一人|留守|るすばん|子ども|子供|お子|大人がいない|だれもいない|誰もいない|開けます|あけます)")
 
@@ -108,7 +108,8 @@ EVENT_FLOOR = {"fire": "emergency", "earthquake": "warn", "blackout": "info", "s
 def judge_rules(ev):
     """ev: {"replies": [{"label", "text"}], "posture": standing/lying/None, "lying_seconds", "found", "room", "who",
     "event": fire/earthquake/... (災害のとき)}。返す: {"level", "reason", "message_to_parent", "points", "reply"}"""
-    labels = [r.get("label") for r in ev.get("replies", [])]
+    labels = [r.get("label") for r in ev.get("replies", [])
+              if r.get("intent") not in ("instruct", "comfort", "close")]   # 「わかった、ひやすね」は様子の返事ではない
     said = [x for x in labels if x is not None]
     if "help" in labels:
         reply = "help"                  # 一度でも助けを求めたら、そのあとの返事より重く見る
@@ -220,7 +221,7 @@ SYSTEM = """あなたは家庭の見守りロボット「アヒル」の頭脳�
 家には見守りカメラ (YOLO で人の位置と姿勢が分かる)、マイク、スピーカー、玄関のスマートロック、インターホンがあり、
 アヒル (歩くロボット) が子どものそばへ行けます。保護者は外出中で、スマホに知らせを受け取ります。
 守ること:
-- 子どもには、ひらがなの多い短い言葉 (1〜2 文) で、やさしく話す。こわがらせない。
+- 子どもには、ひらがなの多い短い言葉 (1 回に 40 字まで) で、やさしく話す。こわがらせない。
 - 危ないことを勧めない。手当ては家庭でできる目安だけ (やけど: すぐ流水で 10 分冷やす、出血: きれいな布でおさえる、
   頭を打った・息が苦しい・動けない: 動かさず、すぐ保護者に連絡)。
 - 火事は「けむりを吸わないよう低い姿勢で外へ」、地震は「机の下で頭を守る、ゆれがおさまるまで動かない」、停電は「その場で待つ」。
@@ -239,7 +240,7 @@ HEAR_PROMPT = """常時マイクが、子どもの次の声を聞きました (�
   urgent (すぐ行く: 助けて・火・煙・動けない)
 - category: injury / illness / fear / fire / disaster / help / talk / none
 - addressed: アヒルに話しかけているか
-- say_now: その部屋のスピーカーですぐ返す一言 (行くときだけ。行かないなら null)
+- say_now: その部屋のスピーカーですぐ返す一言 (20 字まで。行くときだけ。行かないなら null)
 {{"concern": "...", "category": "...", "addressed": true/false, "say_now": "..." or null, "why": "理由 (日本語 1 文)"}}"""
 
 KIND_GOAL = {
@@ -264,7 +265,7 @@ TALK_PROMPT = """{goal}
 問いかけの回数の上限: あと {left} 回。
 
 次の一言を決めてください。
-- say: 次に言う言葉 (done で言うことが無ければ空)
+- say: 次に言う言葉 (40 字まで。done で言うことが無ければ空)。聞きたいことが分かったら早めに done にする
 - intent: {intents} のどれか (ask_ok: 無事か聞く、ask_pain: 痛い所を聞く、ask_more: 詳しく聞く、instruct: どうするか教える、
   comfort: 落ち着かせる、ask_who: 訪問者に用件を聞く、close: 終わりのあいさつ)
 - done: やりとりを終えるなら true (終えるときの say は返事を待たない)
@@ -346,7 +347,7 @@ def talk(kind, ev, situation="", llm=None):
     rules = talk_rules(kind, ev)
     llm = llm if llm is not None else llm_mode()
     d = ev.get("dialog", [])
-    left = MAX_TURNS.get(kind, 4) - sum(1 for t in d if t.get("intent") not in ("instruct", "close"))
+    left = MAX_TURNS.get(kind, 3) - sum(1 for t in d if t.get("intent") not in ("instruct", "close"))
     if llm not in ("claude-code", "api"):
         return rules
     visitor = kind == "visitor"

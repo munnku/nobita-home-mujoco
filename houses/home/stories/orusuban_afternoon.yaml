@@ -47,6 +47,7 @@ chapters:
         ask_ok: {say: "いてて…ころんじゃった。でもへーきだよ", delay: 2.0, then: {pose: stand}}
         ask_more: {say: "ころんで ひざを ぶつけたけど、もう へいき", delay: 1.5, then: {pose: stand}}
         ask_pain: {say: "ううん、どこもいたくない", delay: 1.5}
+        instruct: {say: "わかった", delay: 1.5}
         default: null
 
   - title: "4. お茶でやけど"
@@ -67,7 +68,7 @@ chapters:
     start_after: {kind: voice_judged, delay: 10}
     max_wait: 180
     events:
-      - {t: 0, who: child, say: "おなかすいた。なにか作ろうかな"}
+      # (ひとりごとは言わない。「なにか作ろうかな」を LLM が気にかけて声の対話が重なると、先読みが見えにくい)
       - {t: 2, who: child, at: dk_stove, pose: stand, walk: true, speed: 0.6}
     react:
       child: {on: warn, ignore: 0, delay: 1.0}     # 警告が聞こえたら 1 秒で止まる
@@ -142,7 +143,9 @@ chapters:
       child:
         ask_ok: {say: "うん…こわかったけど、だいじょうぶ", delay: 1.5}
         ask_pain: {say: "どこも いたくないよ", delay: 1.5}
-        ask_more: {say: "ソファの よこで しゃがんでた", delay: 1.5}
+        ask_more: [{say: "ソファの よこで しゃがんでた", delay: 1.5}, {say: "うん、もう だいじょうぶ", delay: 1.5}]
+        instruct: {say: "わかった", delay: 1.5}
+        comfort: {say: "うん", delay: 1.0}
         default: null
 
 end_after: {kind: disaster_judged, delay: 15}
