@@ -1,0 +1,8 @@
+# 昼間。ママは応接室、子どもは居間でくつろいでいる (LLM や WoT から頼みごとを試すための場面)
+name: daytime
+description: 何も起きない昼間 (頼みごとを試す)
+start_clock: "14:00:00"
+duration: 1800
+events:
+  - {t: 0, who: mama, at: ousetsu_sofa, pose: stand}
+  - {t: 0, who: child, at: ima_center, pose: stand}

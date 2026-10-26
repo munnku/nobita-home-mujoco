@@ -26,12 +26,12 @@ from stretch import BASE_RADIUS, Stretch, add_stretch
 from scene import LOOKS, compose, person_pose
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DEFAULT_HOUSE = os.path.join(ROOT, "houses", "nobita")
+DEFAULT_HOUSE = os.path.join(ROOT, "houses", "home")
 LIGHT_ON = np.array([0.45, 0.44, 0.40])
 # 歩き方の方策ごとの前進の指令の上限と下限 (learning/eval_gait.py で測った)
-#   velstand (公開): 指令の 1/3 ほどの速さ。nobita_walk (この家で強化学習): 0.4 で 0.34 m/s、0.2 以下では足踏み
-POLICY_SPEED = {"velstand": (0.3, 0.0), "alpha_walking": (0.3, 0.0), "nobita_walk": (0.4, 0.32),
-                "nobita_walk2": (0.4, 0.3)}
+#   velstand (公開): 指令の 1/3 ほどの速さ。duck_walk (この家で強化学習): 0.4 で 0.34 m/s、0.2 以下では足踏み
+POLICY_SPEED = {"velstand": (0.3, 0.0), "alpha_walking": (0.3, 0.0), "duck_walk": (0.4, 0.32),
+                "duck_walk2": (0.4, 0.3)}
 DUCK_MIN_WZ = 0.7     # その場で回る指令の下限 [rad/s] (歩きの方策は小さい回転の指令を「止まれ」として扱う)
 BACK_VX, BACK_TIME = -0.4, 1.5   # 進まなくなったら後ろへ下がる指令 [m/s] と時間 [s] (-0.3 より遅い指令では下がらない)
 MAX_RETRIES = 3      # 進まなくなったときに経路を作り直す回数
@@ -56,10 +56,10 @@ class World:
     def __init__(self, house_dir=DEFAULT_HOUSE, duck_pose=(0.0, 0.0, 0.0), n_persons=2,
                  policy=None, objects=None, stretch=None, looks=None):
         """looks: 人ごとの見た目 (sim/scene.py の LOOKS)。渡せば人数は len(looks)、無ければ home.yaml の people から。"""
-        # 既定は、この家で強化学習した歩き方 (models/nobita_walk.onnx) があればそれ、なければ公開の velstand
-        default = "nobita_walk" if os.path.exists(os.path.join(ROOT, "models", "nobita_walk.onnx")) else "velstand"
+        # 既定は、この家で強化学習した歩き方 (models/duck_walk.onnx) があればそれ、なければ公開の velstand
+        default = "duck_walk" if os.path.exists(os.path.join(ROOT, "models", "duck_walk.onnx")) else "velstand"
         policy = policy or os.environ.get("DUCK_POLICY", default)
-        if policy.startswith("nobita_walk"):
+        if policy.startswith("duck_walk"):
             policy = os.path.join(ROOT, "models", policy + ".onnx")
         self.layout = load_layout(house_dir)
         self.module = self.layout["module"]

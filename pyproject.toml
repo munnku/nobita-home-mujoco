@@ -1,7 +1,7 @@
 [project]
-name = "nobita-home"
+name = "orusuban-home"
 version = "0.1.0"
-description = "のび太君の家を IoT とロボット (Microduck) で見守る — MuJoCo シミュレーション"
+description = "ひとりで留守番する子どもを IoT とロボット (Microduck) で見守る — MuJoCo シミュレーション"
 requires-python = ">=3.12, <3.13"
 dependencies = [
     "mujoco==3.10.0",

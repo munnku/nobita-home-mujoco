@@ -8,7 +8,7 @@ import json
 import math
 
 M = 0.91
-LABEL = {"dk": "DK", "ima": "居間", "ousetsu": "応接室", "rouka": "廊下", "nobita": "のび太の部屋", "genkan": "玄関",
+LABEL = {"dk": "DK", "ima": "居間", "ousetsu": "応接室", "rouka": "廊下", "kodomo": "子ども部屋", "genkan": "玄関",
          "senmen": "脱衣所", "toilet": "トイレ", "yokushitsu": "浴室"}
 
 

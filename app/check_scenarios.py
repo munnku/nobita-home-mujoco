@@ -151,7 +151,7 @@ def check_afternoon(events):
     return all(p for _, p in marks), f"章 {len(chapters)} 個 / " + why
 
 
-STORIES = {"orusuban_afternoon"}      # houses/nobita/stories/ の物語 (run_scenario.py --story で回す)
+STORIES = {"orusuban_afternoon"}      # houses/home/stories/ の物語 (run_scenario.py --story で回す)
 
 CHECKS = {"orusuban_afternoon": check_afternoon, "hide_sofa": check_hide, "hide_table": check_hide, "hide_cupboard": check_hide, "hazard_patrol": check_patrol,
           "senmen_silent": check_blind("emergency", "blind_lying"), "toilet_long": check_blind(None, "blind_ok"),
@@ -166,8 +166,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", nargs="*", default=["fall", "morning", "homecoming"])
     ap.add_argument("--repeat", type=int, default=1)
-    ap.add_argument("--weights", default=None, help="YOLO の重み (既定は models/yolo_nobita.pt があればそれ)")
-    ap.add_argument("--policy", default=None, help="アヒルの歩き方 (velstand / nobita_walk)")
+    ap.add_argument("--weights", default=None, help="YOLO の重み (既定は models/yolo_person.pt があればそれ)")
+    ap.add_argument("--policy", default=None, help="アヒルの歩き方 (velstand / duck_walk)")
     ap.add_argument("--speed", default="2", help="実時間の何倍で進めるか (0 = できるだけ速く。司令塔は実時間で動くので、"
                                                "0 だと司令塔の反応の遅れがシミュレーションの時間で大きく見える)")
     a = ap.parse_args()
@@ -193,7 +193,7 @@ def main():
             ok, why = CHECKS[name](events)
             rows.append((name, k + 1, ok, why))
             print(f"{name} #{k+1}: {'PASS' if ok else 'FAIL'}  {why}", flush=True)
-    lines = [f"YOLO: {os.environ.get('YOLO_WEIGHTS', '既定')} / 歩き方: {os.environ.get('DUCK_POLICY', '既定 (nobita_walk)')}", "", "| 場面 | 回 | 結果 | 内容 |", "|---|---|---|---|"]
+    lines = [f"YOLO: {os.environ.get('YOLO_WEIGHTS', '既定')} / 歩き方: {os.environ.get('DUCK_POLICY', '既定 (duck_walk)')}", "", "| 場面 | 回 | 結果 | 内容 |", "|---|---|---|---|"]
     lines += [f"| {n} | {k} | {'PASS' if ok else 'FAIL'} | {why} |" for n, k, ok, why in rows]
     stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     path = os.path.join(ROOT, "build", "runs", f"check_{stamp}.md")

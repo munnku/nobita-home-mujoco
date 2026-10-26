@@ -107,9 +107,9 @@ class Patrol(Rule):
                                         "evidence": o.get("image")}, qos=1)
             child = self._child_near(o)
             if child:
-                if child in ("ima", "dk", "rouka", "nobita"):        # スピーカーのある部屋
-                    c.speaker(child, f"のび太くん、床の{what}はさわらないでね。", intent="warn")
-                j.insert(*Job("tmp", 0).say(f"のび太くん、その{what}はさわらないでね。", intent="warn").steps)
+                if child in ("ima", "dk", "rouka", "kodomo"):        # スピーカーのある部屋
+                    c.speaker(child, f"床の{what}はさわらないでね。", intent="warn")
+                j.insert(*Job("tmp", 0).say(f"その{what}はさわらないでね。", intent="warn").steps)
         c.m.publish("home/hazards", [f for f in self.found if f["state"] == "found"], retain=True)
 
     # ---- 片付け (Stretch 3 に VDA 5050 の order を出す)

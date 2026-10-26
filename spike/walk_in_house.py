@@ -1,4 +1,4 @@
-"""のび太君の家の居間で、アヒルを経由点に向けて歩かせ、頭のカメラで YOLO が人を見つけるか確かめる。
+"""この家の居間で、アヒルを経由点に向けて歩かせ、頭のカメラで YOLO が人を見つけるか確かめる。
 
 経由点の追従は「向きの誤差に比例して回り、向きが合っていれば前に進む」だけの簡単な制御。
 結果: build/spike/walk.mp4 (左: 後ろからの視点、右: 頭のカメラ + YOLO)、標準出力に到達時間と検出。
@@ -21,7 +21,7 @@ from duck import Duck  # noqa: E402
 from ultralytics import YOLO  # noqa: E402
 
 PERSON = (1.0, 5.6)
-spec = compose(os.path.join(ROOT, "houses", "nobita"), duck=(0, 0, 0),
+spec = compose(os.path.join(ROOT, "houses", "home"), duck=(0, 0, 0),
                persons=[(PERSON[0], PERSON[1], -0.6, "stand"), (0.5, 3.65, 0.0, "lie")])
 duck = Duck(spec, policy=os.environ.get("POLICY", "alpha_walking"))
 duck.reset(2.9, 3.4, math.pi / 2)

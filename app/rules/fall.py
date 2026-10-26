@@ -22,7 +22,7 @@ SAME_PLACE = 1.5       # 同じ人とみなす距離 [m] (2 台のカメラの�
 LISTEN = 8.0           # 返事を待つ秒数
 ASK = {"ask_ok": "だいじょうぶ？けがはない？", "ask_ok_again": "聞こえる？だいじょうぶ？",
        "ask_pain": "いたいところはある？"}
-CHILD = "のび太"
+CHILD = "子ども"
 
 
 class Fall(Rule):

@@ -1,0 +1,12 @@
+# ひとりで留守番中の子どもが、居間から台所のコンロへ向かう。司令塔が行き先を先読みし、アヒルが先回りして止める
+name: danger_stove
+description: 子どもが居間から台所のコンロへ向かう (先読みして止める)
+mode: alone
+duration: 120
+events:
+  - {t: 0, who: mama, at: outside}
+  - {t: 0, who: child, at: ima_center, pose: stand}
+  - {t: 10, who: child, at: dk_stove, pose: stand, walk: true, speed: 0.6}
+# 警告が聞こえたら 1 秒で止まる
+react:
+  child: {on: warn, ignore: 0, delay: 1.0}

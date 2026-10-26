@@ -2,8 +2,8 @@
 
 コンテナ pai_mujoco の中で (tensorboard と matplotlib がある microduck_rl の venv で) 実行する:
   ~/ext/microduck_rl/.venv/bin/python /home/ubuntu/pai_ws/learning/rl/plot_curve.py [run_dir ...]
-既定は最新の *_nobita_robust と、比べるための 2026-10-19_01-45-26_nobita (平らな床で学習した歩き)。
-出力: docs/learning/rl_<1 つ目の run の nobita_ より後>_curve.{json,png} (rl_robust_curve、rl_robust2_curve)
+既定は最新の *_duck_robust と、比べるための 2026-10-19_01-45-26_duck_walk (平らな床で学習した歩き)。
+出力: docs/learning/rl_<1 つ目の run の duck_ より後>_curve.{json,png} (rl_robust_curve、rl_robust2_curve)
 """
 import glob
 import json
@@ -45,11 +45,11 @@ def load(run_dir):
 
 
 def main():
-    runs = sys.argv[1:] or [sorted(glob.glob(os.path.join(LOGS, "*_nobita_robust")))[-1],
-                            os.path.join(LOGS, "2026-10-19_01-45-26_nobita")]
+    runs = sys.argv[1:] or [sorted(glob.glob(os.path.join(LOGS, "*_duck_robust")))[-1],
+                            os.path.join(LOGS, "2026-10-19_01-45-26_duck_walk")]
     data = {os.path.basename(r): load(r) for r in runs}
     out = os.path.join(ROOT, "docs", "learning")
-    stem = "rl_" + os.path.basename(runs[0]).split("nobita_")[-1] + "_curve"   # rl_robust_curve, rl_robust2_curve
+    stem = "rl_" + os.path.basename(runs[0]).split("duck_")[-1] + "_curve"   # rl_robust_curve, rl_robust2_curve
     with open(os.path.join(out, stem + ".json"), "w", encoding="utf-8") as f:
         json.dump(data, f)
     robust = data[os.path.basename(runs[0])]

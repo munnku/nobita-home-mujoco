@@ -1,8 +1,8 @@
 """学習前と学習後の YOLO を、同じテスト画像 (学習に使っていない場面) で比べる。
 
 A: 公開の YOLOv8s (COCO の person) + 幾何の姿勢判定 (home/perception.py の estimate_person)
-B: 2 クラスで追加学習した YOLOv8s (models/yolo_nobita.pt、クラスで姿勢)
-C: 6 クラスで追加学習した YOLOv8s (models/yolo_nobita_who.pt、クラスで見た目 child / adult / stranger と姿勢)
+B: 2 クラスで追加学習した YOLOv8s (models/yolo_person.pt、クラスで姿勢)
+C: 6 クラスで追加学習した YOLOv8s (models/yolo_person_who.pt、クラスで見た目 child / adult / stranger と姿勢)
 正解の人ごとに: 見つけたか (IoU >= 0.5 の枠があるか)、姿勢が合っているか、(C は) だれかが合っているか。
 誤検出 (正解にない枠) も数える。カメラの種類 (天井の見守りカメラ / アヒルの頭のカメラ)・姿勢・見た目ごとに集計し、
 C の見分けの混同行列 (正解の見た目 × 答えた見た目、見逃しも) を出す。
@@ -158,9 +158,9 @@ def plot(results, out_dir):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--data", default=os.path.join(ROOT, "build", "datasets", "nobita3"))
-    ap.add_argument("--model", default=os.path.join(ROOT, "models", "yolo_nobita_who.pt"))
-    ap.add_argument("--posture-model", default=os.path.join(ROOT, "models", "yolo_nobita.pt"))
+    ap.add_argument("--data", default=os.path.join(ROOT, "build", "datasets", "people3"))
+    ap.add_argument("--model", default=os.path.join(ROOT, "models", "yolo_person_who.pt"))
+    ap.add_argument("--posture-model", default=os.path.join(ROOT, "models", "yolo_person.pt"))
     ap.add_argument("--baseline", default=os.path.join(ROOT, "third_party", "yolov8s.pt"))
     ap.add_argument("--out", default=os.path.join(ROOT, "docs", "learning"))
     a = ap.parse_args()
@@ -169,8 +169,8 @@ def main():
         metas = json.load(f)
     results = {}
     for label, path, who in (("A: 公開 YOLOv8s + 幾何の姿勢判定", a.baseline, False),
-                             ("B: 追加学習 2 クラス (yolo_nobita)", a.posture_model, False),
-                             ("C: 追加学習 6 クラス (yolo_nobita_who)", a.model, True)):
+                             ("B: 追加学習 2 クラス (yolo_person)", a.posture_model, False),
+                             ("C: 追加学習 6 クラス (yolo_person_who)", a.model, True)):
         if not os.path.exists(path):
             print("skip", path)
             continue

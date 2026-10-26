@@ -39,7 +39,7 @@ TRACK_GATE = 1.0       # 同じ人とみなす距離 [m]
 ARRIVED = 0.3          # ふつうの行き先にこれより近ければ、そこに着いたとみなす [m]
 STOP_GUARD = 0.9      # アヒルが立つ所: 危ない場所からこの距離の、子どもの経路の上 [m]
 REPEAT_WARN = 6.0      # 歩きながら声をかける間隔 [s]
-SPEAKERS = ("nobita", "dk", "ima", "rouka")
+SPEAKERS = ("kodomo", "dk", "ima", "rouka")
 
 
 class DistanceFields:
@@ -127,7 +127,7 @@ class Predict(Rule):
         for room, (x, y) in c.home.get("everyday_spots", {}).items():
             goals.append({"name": f"room:{room}", "rect": [(x - 0.3) * M, (x + 0.3) * M, (y - 0.3) * M, (y + 0.3) * M]})
         self.goals = [g["name"] for g in goals]
-        self.df = DistanceFields(os.path.join(c.root, "houses", "nobita"), goals) if self.hazards else None
+        self.df = DistanceFields(os.path.join(c.root, "houses", "home"), goals) if self.hazards else None
         self.tracks = []         # [{"x","y","t","hist":[(t,x,y)], "ll":{goal: 対数尤度}, "v", "warned":{}}]
         self.next_t = 0.0
         self.active = {}         # 危ない場所 → 警告している間の状態
@@ -216,7 +216,7 @@ class Predict(Rule):
     # ---- 備える・警告する
     def _describe(self, h, tr, p, eta, dist):
         top = sorted(tr["prob"].items(), key=lambda kv: -kv[1])[:3]
-        return (f"のび太が{h['label']}へ向かっているかも (確率 {p:.2f}、あと {dist:.1f} m・"
+        return (f"子どもが{h['label']}へ向かっているかも (確率 {p:.2f}、あと {dist:.1f} m・"
                 f"{'%.0f 秒' % eta if math.isfinite(eta) else '止まっている'}) 行き先の候補 "
                 + ", ".join(f"{g.replace('room:', '')} {q:.2f}" for g, q in top))
 
@@ -294,7 +294,7 @@ class Predict(Rule):
                 a.update(min_dist=dist, t_closer=c.time)
             elif a.get("warned") and not a.get("stopped") and c.time - a.get("t_closer", a["t"]) > 3.0:
                 a["stopped"] = True
-                c.log(f"のび太が止まった ({self.hazards[name]['label']}まであと {dist:.1f} m)", kind="child_stopped",
+                c.log(f"子どもが止まった ({self.hazards[name]['label']}まであと {dist:.1f} m)", kind="child_stopped",
                       hazard=name, dist=round(dist, 2))
             if a.get("warned") and c.time >= a["next"] and c.job is not None and c.job.name == "danger" and c.robot.get("driving"):
                 a["next"] = c.time + REPEAT_WARN

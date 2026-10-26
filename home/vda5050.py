@@ -25,9 +25,9 @@ import numpy as np
 from .perception import CameraModel, covered, estimate_object, estimate_person, robot_box
 
 VERSION = "2.0.0"
-MANUFACTURER = "NobitaHome"
+MANUFACTURER = "OrusubanHome"
 SERIAL = "microduck-01"
-MAP_ID = "nobita-1F"
+MAP_ID = "home-1F"
 HAZARD_NECK = -0.8    # 床の物を探すときの首の角度 (下向き) [rad]
 SAME_OBJECT = 0.2     # 同じ物とみなす距離 [m]
 STUCK_FALLEN = 20.0   # 転んでこれだけ起き上がれなければ「助けが要る」と知らせる [s]

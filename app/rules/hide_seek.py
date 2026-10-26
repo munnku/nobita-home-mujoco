@@ -115,7 +115,7 @@ class HideSeek(Rule):
         if self.spots is None:
             from .predict import DistanceFields, Predict
             pred = next((r for r in c.rules if isinstance(r, Predict) and r.df is not None), None)
-            df = pred.df if pred else DistanceFields(os.path.join(c.root, "houses", "nobita"), [])
+            df = pred.df if pred else DistanceFields(os.path.join(c.root, "houses", "home"), [])
             spots = {r: (x * M, y * M) for r, (x, y) in c.home.get("everyday_spots", {}).items()}
             spots.setdefault("dk", spots.get("dk_table"))
             self.spots = hiding_spots(df.map, df.lay, spots)
@@ -149,7 +149,7 @@ class HideSeek(Rule):
         歩く距離は家の地図の上の道のり (家具や壁を回り込む。まっすぐの距離だと、近く見えて遠い所を先にしてしまう)。"""
         from .predict import DistanceFields, Predict
         pred = next((r for r in self.c.rules if isinstance(r, Predict) and r.df is not None), None)
-        df = pred.df if pred else DistanceFields(os.path.join(self.c.root, "houses", "nobita"), [])
+        df = pred.df if pred else DistanceFields(os.path.join(self.c.root, "houses", "home"), [])
         left, order, at = list(self.spots), [], here
         while left:
             field = df._field((at[0] - 0.1, at[0] + 0.1, at[1] - 0.1, at[1] + 0.1))
@@ -189,7 +189,7 @@ class HideSeek(Rule):
             for r in c.rules:
                 if isinstance(r, Fall):
                     r.handled.append({"x": res.get("x", s["x"]), "y": res.get("y", s["y"]), "time": c.time})
-            j.insert(*Job("tmp", 0).say(f"のび太くん、みーつけた！{LABEL.get(s['room'], s['room'])}にいたね。",
+            j.insert(*Job("tmp", 0).say(f"みーつけた！{LABEL.get(s['room'], s['room'])}にいたね。",
                                          intent="hide_found").then(self._end).steps)
         else:
             c.log(f"{s['name']}にはいない", kind="hide_miss", spot=s["name"])

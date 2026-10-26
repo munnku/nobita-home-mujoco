@@ -8,9 +8,9 @@
 
 クラス (見た目 × 姿勢): 0 = child_standing, 1 = child_lying, 2 = adult_standing, 3 = adult_lying,
 4 = stranger_standing, 5 = stranger_lying
-出力: build/datasets/nobita3/{images,labels}/{train,val,test}/*.{jpg,txt} と data.yaml (Ultralytics の形式)
+出力: build/datasets/people3/{images,labels}/{train,val,test}/*.{jpg,txt} と data.yaml (Ultralytics の形式)
 uv run python learning/make_dataset.py --scenes 2400 --seed 0
-(以前の 2 クラス (person_standing / person_lying) のデータは build/datasets/nobita。models/yolo_nobita.pt はそれで学習した)
+(以前の 2 クラス (person_standing / person_lying) のデータは build/datasets/people。models/yolo_person.pt はそれで学習した)
 """
 import argparse
 import math
@@ -35,7 +35,7 @@ PERSON_LOOKS = ["child", "adult", "stranger"]       # 人 i の見た目 (1 人�
 CLASSES = [f"{look}_{p}" for look in PERSON_LOOKS for p in ("standing", "lying")]
 N_PEOPLE = ([1, 2, 3], [0.35, 0.45, 0.2])           # 1 枚に置く人数とその割合
 # 人を置く部屋 (見守りカメラのある部屋と、カメラの無い廊下の奥、玄関の土間など)
-ROOMS = ["ima", "ousetsu", "dk", "rouka", "nobita", "genkan"]
+ROOMS = ["ima", "ousetsu", "dk", "rouka", "kodomo", "genkan"]
 
 
 def inside_furniture(lay, level, x, y, margin):
@@ -117,7 +117,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--scenes", type=int, default=2400)
     ap.add_argument("--seed", type=int, default=0)
-    ap.add_argument("--out", default=os.path.join(ROOT, "build", "datasets", "nobita3"))
+    ap.add_argument("--out", default=os.path.join(ROOT, "build", "datasets", "people3"))
     a = ap.parse_args()
     rng = random.Random(a.seed)
     w = World(looks=PERSON_LOOKS)
@@ -177,7 +177,7 @@ def main():
             name = f"s{a.seed}_{s:05d}_{cam}"
             Image.fromarray(img).save(os.path.join(a.out, "images", split, name + ".jpg"), quality=92)
             cid = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_CAMERA, cam)
-            level = "2F" if cam == "cam_nobita" else "1F"
+            level = "2F" if cam == "cam_kodomo" else "1F"
             meta[split][name] = {
                 "camera": cam, "pos": w.data.cam_xpos[cid].round(4).tolist(),
                 "R": w.data.cam_xmat[cid].round(5).tolist(), "fovy": float(m.cam_fovy[cid]),

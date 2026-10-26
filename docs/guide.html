@@ -1,4 +1,4 @@
-<title>のび太君の家のしくみ</title>
+<title>おるすばんアヒルのしくみ</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -114,8 +114,8 @@ dl.terms dd { margin: 0; color: var(--ink); }
 <main>
 <header class="top">
   <div class="eyebrow">PAI1-mujoco ・ 2026-10-19 の実装</div>
-  <h1>のび太君の家のしくみ</h1>
-  <p>MuJoCo の中ののび太君の家で、見守りカメラなどの家の機器と、二足歩行の小さなロボット (アヒル) と、LLM が手分けして家族を見守る。その中身を、部品ごとに「何をしているか・どう動くか・なぜそうなっているか」で説明する。各節の終わりに、自分で動かして確かめる方法を書いた。</p>
+  <h1>おるすばんアヒルのしくみ</h1>
+  <p>MuJoCo の中のこの家で、見守りカメラなどの家の機器と、二足歩行の小さなロボット (アヒル) と、LLM が手分けして家族を見守る。その中身を、部品ごとに「何をしているか・どう動くか・なぜそうなっているか」で説明する。各節の終わりに、自分で動かして確かめる方法を書いた。</p>
 </header>
 
 <section id="big">
@@ -209,7 +209,7 @@ sequenceDiagram
 
 <section id="house">
   <h2><span class="no">4</span>家</h2>
-  <p>家は手で描いていない。間取り図を読み取った <code>houses/nobita/layout.yaml</code> から、<code>sim/house.py</code> が MuJoCo の形式 (MJCF) を毎回作る。</p>
+  <p>家は手で描いていない。間取り図を読み取った <code>houses/home/layout.yaml</code> から、<code>sim/house.py</code> が MuJoCo の形式 (MJCF) を毎回作る。</p>
   <h3>マス目で書く</h3>
   <p>日本の家は半間 (0.91 m) の倍数で設計されている。間取り図に半間のマス目を重ねると、壁がほぼマス目の線に乗る。そこで YAML の座標はマスの数で書き、作るときに 0.91 を掛けて m にする。</p>
 <pre class="ex">- {name: ima, label: 居間, level: 1F, rect: [4, 9, 0, 4], material: tatami}   # x 4〜9、y 0〜4 マス
@@ -222,7 +222,7 @@ sequenceDiagram
     <li><strong>扉</strong>: 開き戸は回る関節、引き戸は滑る関節を持つ体。IoT で開け閉めするときは関節の角度を書き換える。</li>
     <li><strong>階段・家具・天井・屋根・照明 (7 灯)・見守りカメラ (5 台)</strong>。</li>
   </ul>
-  <div class="why"><b>表示のグループ。</b> MuJoCo の形には見せ方の番号 (group) を付けられる。1 階は 0、2 階は 4、天井と屋根は 5 にした。見下ろしの絵では 4 と 5 を隠すと 1 階の中が見える。人を 2 階に置くと人のグループも 4 に変えるので、1 階を見下ろしたときに 2 階ののび太が浮いて見えない。</div>
+  <div class="why"><b>表示のグループ。</b> MuJoCo の形には見せ方の番号 (group) を付けられる。1 階は 0、2 階は 4、天井と屋根は 5 にした。見下ろしの絵では 4 と 5 を隠すと 1 階の中が見える。人を 2 階に置くと人のグループも 4 に変えるので、1 階を見下ろしたときに 2 階の子どもが浮いて見えない。</div>
   <div class="why"><b>扉は押されても動かない。</b> 扉の関節は物理で自由に動くので、立っている人の当たり判定に押されて閉まりかけ、アヒルが応接室に入れなくなったことがあった。今は毎ステップ、決めた角度に戻している。</div>
   <div class="try"><div class="tag">確かめる</div>
     <p>家を上から・斜めから・各カメラから描いて <code>build/house/</code> に保存する。<code>layout.yaml</code> のちゃぶ台の <code>rect</code> を書き換えてもう一度描くと、家が YAML から作られていることが分かる。</p>
@@ -250,7 +250,7 @@ sequenceDiagram
   <p>元のデータのカメラは、設計ソフト (Onshape) の座標のままで、後ろ上を向き、絵も 90° 回っていた。MuJoCo のカメラの約束 (−z が視線、y が上) に合うよう回し、広角 (75°) で少し上向き (10°) にした (<code>sim/scene.py</code> の <code>add_duck</code>)。</p>
   <div class="try"><div class="tag">確かめる</div>
     <p>速度指令を出したとき、実際にどれだけ進み、どれだけ回るかを方策ごとに測る。</p>
-<pre class="cmd">uv run python learning/eval_gait.py --policy velstand --policy nobita_walk</pre>
+<pre class="cmd">uv run python learning/eval_gait.py --policy velstand --policy duck_walk</pre>
   </div>
 </section>
 
@@ -331,7 +331,7 @@ homie/cam-ima/camera/persons          [{"x":5.8,"y":1.2,"posture":"lying",...}]<
     <tr><td><code>…/state</code></td><td>アヒル → 司令塔</td><td>位置、歩いているか、どのノードまで来たか、各 action の状態 (WAITING / RUNNING / FINISHED / FAILED) と結果。1 秒ごと。</td></tr>
     <tr><td><code>…/factsheet</code></td><td>アヒル → 誰でも</td><td>できること一覧 (どの action をどんな引数で受け付けるか、最高速度など)。</td></tr>
   </table></div>
-  <p>トピックの頭は <code>uagv/v2/NobitaHome/microduck-01/</code>。使っている action は <code>detectObject</code> (VDA 5050 で決まっている「物を探す」。ここでは人)、<code>speak</code> (この家で足した「話す」)、<code>wait</code>。</p>
+  <p>トピックの頭は <code>uagv/v2/OrusubanHome/microduck-01/</code>。使っている action は <code>detectObject</code> (VDA 5050 で決まっている「物を探す」。ここでは人)、<code>speak</code> (この家で足した「話す」)、<code>wait</code>。</p>
   <div class="why"><b>アヒルが経路を考える。</b> order にはノード (行き先) だけを書く。途中の道はアヒルが自分の地図で考える。ノードの <code>allowedDeviationXY</code> (この距離まで近づけば着いたとする) を使って、「人のそばまで」を表している。</div>
   <div class="why"><b>アヒルに指示を出すのは司令塔だけ。</b> VDA 5050 では、1 台のロボットに order を出す管理システムは 1 つという前提。LLM がアヒルを動かしたいときも、直接 order を出さずに司令塔に頼む。</div>
   <div class="try"><div class="tag">確かめる</div>
@@ -346,7 +346,7 @@ homie/cam-ima/camera/persons          [{"x":5.8,"y":1.2,"posture":"lying",...}]<
   <div class="scroll"><table>
     <tr><th>決まりごと</th><th>見るもの</th><th>すること</th></tr>
     <tr><td>転倒</td><td>見守りカメラの「横になった人」</td><td>3 秒続いたら照明をつけ、アヒルに確かめさせ、結果で知らせる / 取り消す。寝室の布団の人は除く。</td></tr>
-    <tr><td>起床</td><td>家の時計 (7:00) と、のび太の部屋のカメラ</td><td>布団で寝ていたら、部屋の照明とスピーカー、アヒルが階段の下から呼ぶ。30 秒ごとにもう一度、それでも起きなければママ (1 階で立っている人) に知らせに行く。起きたら取り消す。</td></tr>
+    <tr><td>起床</td><td>家の時計 (7:00) と、子ども部屋のカメラ</td><td>布団で寝ていたら、部屋の照明とスピーカー、アヒルが階段の下から呼ぶ。30 秒ごとにもう一度、それでも起きなければママ (1 階で立っている人) に知らせに行く。起きたら取り消す。</td></tr>
     <tr><td>玄関</td><td>鍵と扉の開閉センサー</td><td>扉が開いたらアヒルが見に行き、人がいれば「おかえりなさい」。閉まって 20 秒鍵が開いたままなら施錠。</td></tr>
     <tr><td>照明</td><td>人感センサーと照明</td><td>だれもいない部屋の照明を 60 秒で消す。人が来たらつける。</td></tr>
     <tr><td>依頼</td><td><code>home/coordinator/requests</code></td><td>WoT (LLM) からの「部屋へ行く・部屋を確かめる・戻る」を仕事にし、終わったら結果を返す。</td></tr>
@@ -406,7 +406,7 @@ TD の書けるプロパティ   → 道具 light-ima__set__on(value)
   <p class="note">テスト画像も同じシミュレーション (同じ人の形、同じ家) から作っているので、この数字は「この家の MuJoCo の絵に対して」の精度。</p>
   <div class="try"><div class="tag">確かめる</div>
     <p>データの正解の枠を絵に重ねて並べる (緑 = 立っている、赤 = 横)。学習曲線は <code>docs/learning/results.png</code>。</p>
-<pre class="cmd">uv run python learning/show_labels.py build/datasets/nobita test 16</pre>
+<pre class="cmd">uv run python learning/show_labels.py build/datasets/people test 16</pre>
 <pre class="cmd">uv run python app/check_scenarios.py --only fall_dk --weights third_party/yolov8s.pt</pre>
   </div>
 </section>
@@ -421,18 +421,18 @@ TD の書けるプロパティ   → 道具 light-ima__set__on(value)
     <li>タスクは公開のもの (<code>Mjlab-Velocity-Flat-Backlash-MicroDuck</code>) をそのまま使い、報酬などは変えていない。Docker (GPU 付き) で 1500 回更新、約 2.5 時間。</li>
   </ul>
   <div class="scroll"><table>
-    <tr><th>指令</th><th>公開 velstand</th><th>学習した nobita_walk</th></tr>
+    <tr><th>指令</th><th>公開 velstand</th><th>学習した duck_walk</th></tr>
     <tr><td>前へ 0.4 m/s</td><td class="num">0.142 m/s</td><td class="num">0.343 m/s</td></tr>
     <tr><td>前へ 0.3 m/s</td><td class="num">0.096 m/s</td><td class="num">0.111 m/s</td></tr>
     <tr><td>前へ 0.2 m/s 以下</td><td class="num">ゆっくり進む</td><td class="num">足踏み</td></tr>
     <tr><td>回る 1.0 rad/s</td><td class="num">0.96 rad/s</td><td class="num">0.48 rad/s</td></tr>
   </table></div>
-  <p>速いが、小さい指令では足踏みになり、回るのは遅い。そこで方策ごとに前進の指令の上限と下限を決めた (<code>sim/world.py</code> の <code>POLICY_SPEED</code>。nobita_walk は 0.32〜0.4)。転倒の知らせまでの時間は、居間 15.6 → 11.0 秒、応接室 40.6 → 23.6 秒、DK 53.8 → 29.6 秒になった。</p>
+  <p>速いが、小さい指令では足踏みになり、回るのは遅い。そこで方策ごとに前進の指令の上限と下限を決めた (<code>sim/world.py</code> の <code>POLICY_SPEED</code>。duck_walk は 0.32〜0.4)。転倒の知らせまでの時間は、居間 15.6 → 11.0 秒、応接室 40.6 → 23.6 秒、DK 53.8 → 29.6 秒になった。</p>
   <p class="note">公開の方策より速くなった理由は、はっきりとは分かっていない。公開の方策は別のタスク (歩く・立つ・起き上がるを 1 つで、でこぼこの床) で学習されていて、その違いが考えられる。</p>
   <div class="try"><div class="tag">確かめる</div>
     <p>学習曲線 <code>docs/learning/rl_curve.png</code> を見る。歩き方を替えて同じ場面を回す。</p>
 <pre class="cmd">uv run python app/check_scenarios.py --only fall_dk --policy velstand</pre>
-<pre class="cmd">uv run python app/check_scenarios.py --only fall_dk --policy nobita_walk</pre>
+<pre class="cmd">uv run python app/check_scenarios.py --only fall_dk --policy duck_walk</pre>
   </div>
 </section>
 
@@ -456,7 +456,7 @@ TD の書けるプロパティ   → 道具 light-ima__set__on(value)
     <li><strong>アヒルを歩かせる</strong>: <code>spike/nav_test.py</code>。地図と経路の絵を見る。</li>
     <li><strong>カメラで人を見る</strong>: <code>spike/perception_test.py</code>。推定と正解の差を見る。</li>
     <li><strong>場面を通す</strong>: <code>app/run_scenario.py --scenario fall --speed 1 --viewer</code>。同時に <code>app/mqtt_watch.py</code> でメッセージを見る。</li>
-    <li><strong>場面を書き換える</strong>: <code>houses/nobita/scenarios/fall.yaml</code> の倒れる場所 (<code>at</code>) を <code>home.yaml</code> の別の場所に変えて回す。</li>
+    <li><strong>場面を書き換える</strong>: <code>houses/home/scenarios/fall.yaml</code> の倒れる場所 (<code>at</code>) を <code>home.yaml</code> の別の場所に変えて回す。</li>
     <li><strong>家を動かしたまま頼む</strong>: <code>app/start_home.py</code> を動かし、<code>app/wot_cli.py</code> で道具を呼ぶ。</li>
     <li><strong>学習の効果を比べる</strong>: <code>app/check_scenarios.py</code> を <code>--weights</code> と <code>--policy</code> を替えて回す。</li>
   </ol>

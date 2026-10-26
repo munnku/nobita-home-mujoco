@@ -191,8 +191,8 @@
    ]
   }
  },
- "B: 追加学習 2 クラス (yolo_nobita)": {
-  "weights": "models/yolo_nobita.pt",
+ "B: 追加学習 2 クラス (yolo_person)": {
+  "weights": "models/yolo_person.pt",
   "who": false,
   "stats": {
    "iot/lying/all": {
@@ -383,8 +383,8 @@
    ]
   }
  },
- "C: 追加学習 6 クラス (yolo_nobita_who)": {
-  "weights": "models/yolo_nobita_who.pt",
+ "C: 追加学習 6 クラス (yolo_person_who)": {
+  "weights": "models/yolo_person_who.pt",
   "who": true,
   "stats": {
    "iot/lying/all": {

@@ -1,4 +1,4 @@
-"""のび太君の家の床で歩く Microduck の方策 (Mjlab-Nobita-Clutter[2]-Backlash-MicroDuck)。
+"""この家の床で歩く Microduck の方策 (Mjlab-Home-Clutter[2]-Backlash-MicroDuck)。
 
 microduck_rl の速度追従タスク (rough=True) をもとに、地形を「家の床」に入れ替える。
 - flat     : 何もない床 (フローリング・畳)
@@ -11,9 +11,9 @@ microduck_rl の速度追従タスク (rough=True) をもとに、地形を「�
 学習済みの歩きから温めて始めるので、元のタスクの段階的な curriculum は最後の段に固定する
 (velstand と同じやり方)。地形の curriculum (terrain_levels) だけは段階を上がっていく。
 
-version 1 (nobita_robust, 2026-10-23): 座布団 30〜60 mm、接触はほぼ硬い (4 mm しか沈まない)。
+version 1 (duck_robust, 2026-10-23): 座布団 30〜60 mm、接触はほぼ硬い (4 mm しか沈まない)。
   mjlab の terrain_levels は「4 m 進めば上へ」で、0.34 m/s のアヒルには届かず全員が 0 段に落ちた。
-version 2 (nobita_robust2): 座布団 30〜45 mm、約 2 cm 沈む (床の下まである背の高い箱にして突き抜けない)。
+version 2 (duck_robust2): 座布団 30〜45 mm、約 2 cm 沈む (床の下まである背の高い箱にして突き抜けない)。
   地形の段は「倒れずに 1 回 (20 s) を終えたら上へ、倒れたら下へ」(terrain_levels_survival)。
 
 このファイルは PAI1-mujoco/learning/rl/ に置き、install.sh が
@@ -195,7 +195,7 @@ class ClutterTerrainCfg(SubTerrainCfg):
         return TerrainOutput(origin=origin, geometries=geoms)
 
 
-NOBITA_HOUSE_TERRAINS_CFG = TerrainGeneratorCfg(
+HOME_TERRAINS_CFG = TerrainGeneratorCfg(
     size=(8.0, 8.0),
     border_width=20.0,
     num_rows=10,
@@ -215,10 +215,10 @@ NOBITA_HOUSE_TERRAINS_CFG = TerrainGeneratorCfg(
 )
 
 # version 2: 座布団を低く柔らかく (30〜45 mm、約 2 cm 沈む)。ほかは v1 と同じ
-NOBITA_HOUSE_TERRAINS_CFG2 = replace(
-    NOBITA_HOUSE_TERRAINS_CFG,
+HOME_TERRAINS_CFG2 = replace(
+    HOME_TERRAINS_CFG,
     sub_terrains={
-        **NOBITA_HOUSE_TERRAINS_CFG.sub_terrains,
+        **HOME_TERRAINS_CFG.sub_terrains,
         "zabuton": ZabutonTerrainCfg(proportion=0.15, height_range=(0.03, 0.045), solref=ZABUTON2_SOLREF,
                                      solimp=ZABUTON2_SOLIMP, depth=ZABUTON2_DEPTH),
     },
@@ -260,15 +260,15 @@ def _house_floor_contacts(spec: mujoco.MjSpec) -> None:
         if abs(geom.friction[0] - 1.0) < 1e-9:  # MuJoCo の既定値のまま = 板の間
             geom.friction[0] = FLOOR_FRICTION
             n_floor += 1
-    print(f"[nobita terrain] {n_soft} soft zabuton geoms, {n_floor} floor geoms (friction {FLOOR_FRICTION})")
+    print(f"[home terrain] {n_soft} soft zabuton geoms, {n_floor} floor geoms (friction {FLOOR_FRICTION})")
 
 
-def make_nobita_clutter_env_cfg(play: bool = False, version: int = 1):
+def make_home_clutter_env_cfg(play: bool = False, version: int = 1):
     cfg = make_microduck_velocity_env_cfg(play=play, rough=True)
     if WARM_START and not play:
         _collapse_curricula_to_final(cfg)
 
-    base = NOBITA_HOUSE_TERRAINS_CFG2 if version >= 2 else NOBITA_HOUSE_TERRAINS_CFG
+    base = HOME_TERRAINS_CFG2 if version >= 2 else HOME_TERRAINS_CFG
     gen = replace(base, sub_terrains=dict(base.sub_terrains))
     if version >= 2 and "terrain_levels" in cfg.curriculum:
         cfg.curriculum["terrain_levels"].func = terrain_levels_survival
@@ -283,5 +283,5 @@ def make_nobita_clutter_env_cfg(play: bool = False, version: int = 1):
     return cfg
 
 
-NobitaClutterRlCfg = replace(MicroduckRlCfg, run_name="nobita_robust")
-NobitaClutter2RlCfg = replace(MicroduckRlCfg, run_name="nobita_robust2")
+HomeClutterRlCfg = replace(MicroduckRlCfg, run_name="duck_robust")
+HomeClutter2RlCfg = replace(MicroduckRlCfg, run_name="duck_robust2")

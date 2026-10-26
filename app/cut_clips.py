@@ -1,7 +1,7 @@
 """物語の録画を、場面ごとのファイルに切り分ける (動画の編集用)。
 
 uv run python app/cut_clips.py --story orusuban_afternoon --video build/videos/orusuban_afternoon_v3.mp4 [--run build/runs/....json]
-切り方は houses/nobita/stories/<物語>_clips.yaml。印 (司令塔のログの kind・扉の操作) の時刻は run_scenario.py の結果
+切り方は houses/home/stories/<物語>_clips.yaml。印 (司令塔のログの kind・扉の操作) の時刻は run_scenario.py の結果
 (--run、無ければその物語のいちばん新しいもの) から取る。録画はシミュレーションの時刻と同じ時間軸 (0 秒から 15 fps)。
 結果: build/videos/<物語>_clips/NN_<名前>_x<倍速>.mp4 と 構成.md (各ファイルの長さ・勧める倍速・倍速後の合計)
 """
@@ -50,7 +50,7 @@ def main():
     ap.add_argument("--story", default="orusuban_afternoon")
     ap.add_argument("--video", required=True)
     ap.add_argument("--run", default=None)
-    ap.add_argument("--house", default=os.path.join(ROOT, "houses", "nobita"))
+    ap.add_argument("--house", default=os.path.join(ROOT, "houses", "home"))
     ap.add_argument("--dry", action="store_true", help="切らずに長さだけ出す")
     a = ap.parse_args()
     run = a.run or max(glob.glob(os.path.join(ROOT, "build", "runs", f"{a.story}_*.json")), key=os.path.getmtime)

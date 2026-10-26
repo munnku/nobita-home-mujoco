@@ -30,24 +30,24 @@ class WakeUp(Rule):
         now = secs(c.clock)
         if w["state"] == "idle" and now >= secs(cfg["time"]) and now < secs(cfg["time"]) + 3600:
             if self._asleep():
-                c.log(f"{cfg['time'][:5]} になってものび太が布団で寝ている → 起こす", kind="wake_up", room=cfg["room"])
+                c.log(f"{cfg['time'][:5]} になっても子どもが布団で寝ている → 起こす", kind="wake_up", room=cfg["room"])
                 c.light(cfg["room"])
-                c.speaker(cfg["room"], "のび太くん、7時だよ。起きて！")
+                c.speaker(cfg["room"], "7時だよ。起きて！")
                 cp = cfg["call_point"]
-                c.add_job(Job("wake_up", 1).go(cp["x"] * M, cp["y"] * M, 0.25).say("のび太くーん、朝ですよー！"))
+                c.add_job(Job("wake_up", 1).go(cp["x"] * M, cp["y"] * M, 0.25).say("おーい、朝ですよー！"))
                 w.update(state="called", t=c.time, tries=1)
             else:
                 w["state"] = "done"
         elif w["state"] == "called":
             if self._asleep() is False:
-                c.log("のび太が起きた", kind="woke_up", room=cfg["room"])
+                c.log("子どもが起きた", kind="woke_up", room=cfg["room"])
                 c.speaker(cfg["room"], "おはよう！朝ごはんができているよ。")
                 w["state"] = "done"
             elif c.time - w["t"] > cfg["retry_after"] and w["tries"] == 1:
                 c.log("まだ寝ている → もう一度起こす", room=cfg["room"])
-                c.speaker(cfg["room"], "のび太くん！遅刻するよ！")
+                c.speaker(cfg["room"], "起きて！遅刻するよ！")
                 cp = cfg["call_point"]
-                c.add_job(Job("wake_up", 1).go(cp["x"] * M, cp["y"] * M, 0.25).say("のび太くーん！遅刻しますよー！"))
+                c.add_job(Job("wake_up", 1).go(cp["x"] * M, cp["y"] * M, 0.25).say("おーい！遅刻しますよー！"))
                 w.update(t=c.time, tries=2)
             elif c.time - w["t"] > cfg["retry_after"] and w["tries"] == 2:
                 mama = self._someone_standing(exclude_room=cfg["room"])
@@ -56,13 +56,13 @@ class WakeUp(Rule):
                     c.log(f"それでも起きない → {LABEL.get(room, room)}にいるママに知らせに行く", kind="tell_family")
                     c.add_job(Job("tell_mama", 1).go(p["x"], p["y"], 2.0, [
                         action("detectObject", "x-detect", objectType="person", targetX=p["x"], targetY=p["y"],
-                               duration=6.0)]).say("のび太くんがまだ起きません。起こしてあげてください。"))
+                               duration=6.0)]).say("子どもがまだ起きません。起こしてあげてください。"))
                 else:
                     c.log("それでも起きない → 家族のスマホに知らせる", kind="tell_family")
                     c.m.publish("home/alerts", {"type": "not_awake", "time": round(c.time, 1)}, qos=1)
                 w.update(state="told", t=c.time, tries=3)
         elif w["state"] == "told" and self._asleep() is False:
-            c.log("のび太が起きた", kind="woke_up", room=cfg["room"])
+            c.log("子どもが起きた", kind="woke_up", room=cfg["room"])
             c.speaker(cfg["room"], "おはよう！")
             c.cancel_jobs("tell_mama")       # 知らせに行く途中なら取り消す
             w["state"] = "done"

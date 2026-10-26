@@ -1,0 +1,15 @@
+# 居間で転んだ子どもが痛がる。しばらくして立つが、けがをしている → warn (早めに確かめてほしい)
+name: fall_hurt
+description: 居間で転んだ子どもが「いたい」と言う (けが)
+duration: 200
+events:
+  - {t: 0, who: mama, at: outside}
+  - {t: 0, who: child, at: rouka_mid, pose: stand}
+  - {t: 8, who: child, at: ima_center, pose: stand, walk: true}
+  - {t: 20, who: child, at: ima_fall, pose: lie}
+  - {t: 20.5, who: child, say: "うわーん！"}
+replies:
+  child:
+    ask_ok: {say: "うぅ…いたいよぉ", delay: 2.0}
+    ask_pain: {say: "ひざをすりむいて、ちがでてる", delay: 2.0, then: {pose: stand}}
+    default: null

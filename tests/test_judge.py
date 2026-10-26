@@ -52,7 +52,7 @@ def main():
     bad = 0
     for texts, posture, lying_s, found, want in CASES:
         replies = [{"text": t, "label": classify_reply(t)[0] if t else None} for t in texts]
-        ev = {"who": "のび太", "room": "ima", "room_label": "居間", "replies": replies, "posture": posture,
+        ev = {"who": "子ども", "room": "ima", "room_label": "居間", "replies": replies, "posture": posture,
               "lying_seconds": lying_s, "found": found}
         res = judge(ev, llm=a.llm) if a.llm else judge_rules(ev)
         r = res.get("rules", res)

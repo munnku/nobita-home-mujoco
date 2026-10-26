@@ -3,6 +3,6 @@ name: fall_dk
 description: DK の食卓のそばで倒れる
 duration: 200
 events:
-  - {t: 0, who: tamako, at: dk_table, pose: stand}
-  - {t: 0, who: nobita, at: nobita_desk, pose: stand}
-  - {t: 20, who: tamako, at: dk_fall, pose: lie}
+  - {t: 0, who: mama, at: dk_table, pose: stand}
+  - {t: 0, who: child, at: kodomo_desk, pose: stand}
+  - {t: 20, who: mama, at: dk_fall, pose: lie}

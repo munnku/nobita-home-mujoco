@@ -3,7 +3,7 @@
 # speed は勧める倍速 (編集で掛ける)。要所は 1 倍、ただ歩くところや待つところは速くする。印の間で切らないところは捨てる。
 clips:
   - {name: 帰宅, from: "door:genkan:unlock-2", to: "door_open+2.5", speed: 1,
-     note: のび太が鍵を開けて入り「ただいまー！」}
+     note: 子どもが鍵を開けて入り「ただいまー！」}
   - {name: アヒルが玄関へ, from: "door_open+2.5", to: "greet-1", speed: 3}
   - {name: 見分けて出迎え, from: "greet-1", to: "greet+6", speed: 1,
      note: 頭のカメラで子どもと見分けて「おかえり！」、おるすばんモードへ}
@@ -15,7 +15,7 @@ clips:
      note: 目で確かめて「だいじょうぶ？」、返事を聞いて info と判断}
   - {name: コンロへ, from: "fall_judged+2", to: "predict_hazard-3", speed: 3, note: 先読みで備え始める}
   - {name: 先読みで警告, from: "predict_hazard-3", to: "child_stopped+2", speed: 1,
-     note: コンロに向かうと先読みしてスピーカーで警告、のび太が止まる}
+     note: コンロに向かうと先読みしてスピーカーで警告、子どもが止まる}
   - {name: トイレへ, from: "child_stopped+2", to: "door:toilet:close+1", speed: 2}
   - {name: トイレで待つ, from: "door:toilet:close+1", to: "blind_check", speed: 20, note: 60 秒出てこない}
   - {name: 扉の前へ, from: "blind_check", to: "blind_ok-7", speed: 4}

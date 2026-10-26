@@ -1,4 +1,4 @@
-# のび太君の家の暮らしの設定 (x y はマス 0.91 m、yaw は度、z の代わりに level)
+# この家の暮らしの設定 (x y はマス 0.91 m、yaw は度、z の代わりに level)
 robot:
   dock: {x: 8.0, y: 3.4, yaw: -90}      # アヒルの待機場所 (居間の入口の内側、テレビの横)
 stretch:
@@ -6,8 +6,8 @@ stretch:
   box: [1.15, 5.5]                      # 片付けの箱 (冷蔵庫の東。sim/world.py の TIDY_BOX と同じ)
 # look: 人形の見た目 (sim/scene.py の LOOKS)。child = 子ども (約 1.3 m)、adult = 家の大人、stranger = 知らない大人 (帽子・マスク)
 people:
-  - {name: tamako, label: ママ (玉子), look: adult}
-  - {name: nobita, label: のび太, look: child}
+  - {name: mama, label: ママ, look: adult}
+  - {name: child, label: 子ども, look: child}
   - {name: stranger, label: 知らない人, look: stranger}   # 不審者 (ふだんは家の外)
 # 人役を置く場所 (足元の位置と顔の向き)
 places:
@@ -21,8 +21,8 @@ places:
   ousetsu_fall: {x: 10.2, y: 0.5, yaw: 0, level: 1F}    # 応接室の肘掛け椅子の陰で倒れる
   dk_fall: {x: 3.0, y: 4.6, yaw: 92, level: 1F}         # DK の食卓の北で倒れる
   senmen: {x: 7.0, y: 6.6, yaw: 90, level: 1F}
-  nobita_desk: {x: 8.0, y: 2.3, yaw: 0, level: 2F}
-  nobita_futon: {x: 6.2, y: 2.0, yaw: 0, level: 2F}     # 布団で寝ている
+  kodomo_desk: {x: 8.0, y: 2.3, yaw: 0, level: 2F}
+  kodomo_futon: {x: 6.2, y: 2.0, yaw: 0, level: 2F}     # 布団で寝ている
   outside: null
   genkan_in: {x: 11.2, y: 5.0, yaw: 180, level: 1F, dz: -0.2}   # 玄関の土間 (床より 20 cm 低い)
   dk_stove: {x: 1.15, y: 3.5, yaw: 180, level: 1F}     # 台所のコンロの前
@@ -37,9 +37,9 @@ places:
 
 # 起こす (起床の見守り)
 wake_up:
-  who: nobita
+  who: child
   time: "07:00:00"
-  room: nobita
+  room: kodomo
   bed: [5.6, 8.3, 1.4, 2.8]              # 布団のあたり [xmin, xmax, ymin, ymax] (マス)
   call_point: {x: 7.4, y: 4.6}           # アヒルが 2 階へ呼びかける場所 (階段の下)
   retry_after: 30                        # 起きなければこの秒数後にもう一度、そのあとママに知らせる
@@ -55,11 +55,11 @@ entrance:
 # severity: 危なさの重み (確率 × severity で備える・警告するかを決める。外へ出る・お風呂は低い確率でも早めに動く)
 hazards:
   - {name: stove, label: コンロ, rect: [0.85, 1.5, 3.0, 4.1], speaker: dk, severity: 1.0,
-     say: "のび太くん、コンロはあぶないよ！さわらないでね！", say_walk: "コンロに近づかないで！", say_near: "火はあぶないよ。おやつはテーブルで食べようね。"}
+     say: "コンロはあぶないよ！さわらないでね！", say_walk: "コンロに近づかないで！", say_near: "火はあぶないよ。おやつはテーブルで食べようね。"}
   - {name: genkan, label: 玄関, rect: [10.5, 12.0, 4.0, 6.0], speaker: rouka, severity: 1.5,      # 土間 (下りると外へ出られる)
-     say: "のび太くん、ひとりで外に出ちゃだめだよ！", say_walk: "まって！外に出ないで！", say_near: "ママが帰るまで、おうちで待っていようね。"}
+     say: "ひとりで外に出ちゃだめだよ！", say_walk: "まって！外に出ないで！", say_near: "ママが帰るまで、おうちで待っていようね。"}
   - {name: bath, label: お風呂, rect: [4.1, 5.9, 6.1, 6.9], speaker: rouka, severity: 1.5,
-     say: "のび太くん、ひとりでお風呂に入っちゃだめだよ！", say_walk: "お風呂はあぶないよ！", say_near: "お風呂はママが帰ってからにしようね。"}
+     say: "ひとりでお風呂に入っちゃだめだよ！", say_walk: "お風呂はあぶないよ！", say_near: "お風呂はママが帰ってからにしようね。"}
   - {name: stairs, label: 階段, rect: [5.0, 7.0, 4.0, 5.0], speaker: rouka, severity: 0.6,
      say: "階段は走らないで、ゆっくりね！", say_walk: "ゆっくりね！", say_near: "手すりを持ってね。"}
 # ふつうの行き先 (行き先の推定で、危ない場所と比べる候補)。x y はマス

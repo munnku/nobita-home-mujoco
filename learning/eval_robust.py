@@ -6,7 +6,7 @@
 push: 3〜5 秒ごとに胴体を横から 0.1 s 押す (xfrc_applied、速さが PUSH_DV 変わるくらいの力積)。
 倒れたら (高さ 7 cm 未満か 60° 以上傾く) 指令を 0 にして 10 秒待ち、立ち直れば続きを歩く。
 
-uv run python learning/eval_robust.py [--policy velstand --policy models/nobita_walk.onnx ...] [--seeds 3]
+uv run python learning/eval_robust.py [--policy velstand --policy models/duck_walk.onnx ...] [--seeds 3]
                                       [--recovery own|velstand]
 --recovery own (既定): 方策だけで測る (sim/duck.py の「倒れたら velstand」を止める)。velstand: アプリと同じ
 出力: 標準出力の表、build/learning/robust_eval[_velstand].json、docs/learning/robust_eval[_velstand].md
@@ -29,10 +29,10 @@ import world as world_mod  # noqa: E402
 from navigator import REACH_GOAL, Navigator  # noqa: E402
 
 M = 0.91
-DEFAULT_POLICIES = ["velstand", "models/nobita_walk.onnx", "models/nobita_robust.onnx", "models/nobita_robust2.onnx"]
-# 前進の指令の上限と下限 (sim/world.py の POLICY_SPEED と同じ。nobita_robust* は nobita_walk から温めたので同じ)
-SPEED = {"velstand": (0.3, 0.0), "nobita_walk": (0.4, 0.32), "nobita_robust": (0.4, 0.32),
-         "nobita_robust2": (0.4, 0.32)}
+DEFAULT_POLICIES = ["velstand", "models/duck_walk.onnx", "models/duck_robust.onnx", "models/duck_robust2.onnx"]
+# 前進の指令の上限と下限 (sim/world.py の POLICY_SPEED と同じ。duck_robust* は duck_walk から温めたので同じ)
+SPEED = {"velstand": (0.3, 0.0), "duck_walk": (0.4, 0.32), "duck_robust": (0.4, 0.32),
+         "duck_robust2": (0.4, 0.32)}
 # 居間を横切る道 (半間のマス目)。ちゃぶ台 (6.45〜7.45, 1.7〜2.7) と床の間・押入れ (x < 5) を避ける
 COURSES = {
     "south_E": [(5.3, 0.75), (8.0, 0.75)],
@@ -47,7 +47,7 @@ PUSH_DV = 0.35          # 押しで変わる胴体の速さ [m/s] (学習の pus
 PUSH_DUR = 0.1
 PUSH_EVERY = (3.0, 5.0)
 
-# 座布団の柔らかさ: learning/rl/nobita_clutter_env_cfg.py の version 2 と同じ (約 2 cm 沈む)。
+# 座布団の柔らかさ: learning/rl/home_clutter_env_cfg.py の version 2 と同じ (約 2 cm 沈む)。
 # 柔らかいと薄い箱は突き抜けるので、箱を床の下 ZABUTON_DEPTH まで伸ばす
 ZABUTON_SOLREF = (0.35, 1.5)
 ZABUTON_SOLIMP = (0.3, 0.95, 0.06, 0.5, 2.0)

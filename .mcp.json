@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "nobita-home": {
+    "orusuban-home": {
       "command": "uv",
       "args": ["run", "python", "app/wot_mcp.py"]
     }

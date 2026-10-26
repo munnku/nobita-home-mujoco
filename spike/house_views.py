@@ -12,7 +12,7 @@ if sys.platform.startswith("linux"):
     os.environ.setdefault("MUJOCO_GL", "egl")
 from house import build_with_info  # noqa: E402
 
-xml, door_open = build_with_info(os.path.join(ROOT, "houses", "nobita"))
+xml, door_open = build_with_info(os.path.join(ROOT, "houses", "home"))
 model = mujoco.MjModel.from_xml_string(xml)
 data = mujoco.MjData(model)
 for name, q in door_open.items():

@@ -56,13 +56,13 @@ class Entrance(Rule):
             return
         if who == "child":
             c.log("玄関に子どもがいた → 迎える", kind="greet", who=who)
-            j.say(f"{self.cfg.get('child_name', 'のび太')}くん、おかえり！手を洗ってね。", intent="greet")
+            j.say("おかえり！手を洗ってね。", intent="greet")
             d = c.home["robot"]["dock"]
             j.go(d["x"] * M, d["y"] * M, 0.3)       # 先に居間へ戻る (廊下で子どもの通り道をふさがない)
             if c.mode == "away":
                 # 子どもが帰ってきたが、家の大人は出かけている: おるすばんモードにする
                 c.m.publish("home/mode", "alone", retain=True)
-                c.log("のび太が帰ってきた。ママは出かけているので、おるすばんモードにする", kind="alone_start")
+                c.log("子どもが帰ってきた。ママは出かけているので、おるすばんモードにする", kind="alone_start")
         else:
             c.log("玄関に家の人がいた → 迎える", kind="greet", who=who)
             j.say("おかえりなさい！")

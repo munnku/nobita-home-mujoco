@@ -73,7 +73,7 @@ class HomeDevices:
             self.lights[name].set("light", "on", world.light_is_on(name))
         # スマートスピーカー (話す内容を home/speech に出す)
         self.speakers = {}
-        for name in ("nobita", "dk", "ima", "rouka"):
+        for name in ("kodomo", "dk", "ima", "rouka"):
             self.speakers[name] = HomieDevice(
                 mqtt, _dev_id("speaker", name), f"スマートスピーカー ({rooms[name]['label']})",
                 {"speaker": {"name": "スピーカー", "type": "speaker", "properties": {

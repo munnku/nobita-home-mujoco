@@ -5,8 +5,8 @@ stretch: true
 mode: alone
 duration: 540        # 見回り (約 4 分) のあと、Stretch が 3 個を片付けるまで
 events:
-  - {t: 0, who: tamako, at: outside}
-  - {t: 0, who: nobita, at: ousetsu_sofa, pose: stand}
+  - {t: 0, who: mama, at: outside}
+  - {t: 0, who: child, at: ousetsu_sofa, pose: stand}
   - {t: 2, mqtt: home/patrol/request, payload: {by: mama-app}}    # ママが外出先のアプリで見回りを頼む
 objects:
   - {kind: button_battery, at: [6.4, 0.6]}       # 居間 (ちゃぶ台の南)

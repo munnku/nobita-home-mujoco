@@ -75,7 +75,7 @@ def homie_td(cat, dev, base):
                 p["type"] = "string"
                 p["contentMediaType"] = "application/json"
             props[name] = p
-    return {"@context": TD_CONTEXT, "id": f"urn:nobita-home:{dev}", "title": str(cat.get(f"homie/{dev}/$name", dev)),
+    return {"@context": TD_CONTEXT, "id": f"urn:orusuban-home:{dev}", "title": str(cat.get(f"homie/{dev}/$name", dev)),
             "@type": "homie:Device", **NOSEC, "properties": props, "actions": {}, "events": {}}
 
 
@@ -113,9 +113,9 @@ def robot_td(cat, rooms, base, tid="robot"):
     props = {"state": {"title": "アヒルの状態 (位置・いる部屋・動いているか・最近のアクション)", "type": "object",
                        "readOnly": True, "observable": True,
                        "forms": [_http(base, tid, "properties", "state", ["readproperty"], "GET"),
-                                 {"href": BROKER, "mqv:topic": "uagv/v2/NobitaHome/microduck-01/state",
+                                 {"href": BROKER, "mqv:topic": "uagv/v2/OrusubanHome/microduck-01/state",
                                   "op": ["readproperty", "observeproperty"], "contentType": "application/json"}]}}
-    return {"@context": TD_CONTEXT, "id": f"urn:nobita-home:{tid}",
+    return {"@context": TD_CONTEXT, "id": f"urn:orusuban-home:{tid}",
             "title": f"見守りロボット ({ts.get('seriesName', 'Microduck')})",
             "description": ts.get("seriesDescription", ""), **NOSEC, "properties": props, "actions": actions,
             "events": {}}

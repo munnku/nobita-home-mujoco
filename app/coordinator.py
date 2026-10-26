@@ -36,7 +36,7 @@ from app.rules.wake_up import WakeUp  # noqa: E402
 from home.mqttc import Mqtt  # noqa: E402
 from home.vda5050 import action, make_order, topic  # noqa: E402
 
-HOUSE = os.path.join(ROOT, "houses", "nobita")
+HOUSE = os.path.join(ROOT, "houses", "home")
 JOB_TIMEOUT = 300.0    # 1 つの手順にこれ以上かかったら仕事をやめる [s]
 
 

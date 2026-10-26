@@ -41,7 +41,7 @@ VDA 5050 の `pick` / `drop` アクションは、`pick_step` / `drop_step` が 
 
 - `apply_bam(spec, ...)` が **spec の全アクチュエータ** を BAM のモーターに替え、関節の damping も 0 にする。Stretch のアクチュエータ (名前が `st_` で始まる) を除くこと。除かないと Stretch の腕・車輪がトルク 0 のモーターになり動かない。
 - `Duck.__init__` の `qpos_idx` / `qvel_idx` / `last_action` が `range(model.nu)` を使う。Stretch の 10 個が足されると観測の形が合わず止まる。Microduck の 14 個に絞ること (Stretch は後につなぐので先頭 14 個)。
-- 上の 2 つを試験の中で継ぎはぎして、のび太君の家の居間 (台車 (5.0, 3.0)、ビー玉 (5.08, 2.62)) で `Duck.step` ごとに `pick_step` を呼び、weld 補助なしで拾えることを確かめた (19.4 s)。アヒルと同時に歩かせる確認はしていない。
+- 上の 2 つを試験の中で継ぎはぎして、この家の居間 (台車 (5.0, 3.0)、ビー玉 (5.08, 2.62)) で `Duck.step` ごとに `pick_step` を呼び、weld 補助なしで拾えることを確かめた (19.4 s)。アヒルと同時に歩かせる確認はしていない。
 
 ## わかったこと
 
@@ -75,6 +75,6 @@ VDA 5050 の `pick` / `drop` アクションは、`pick_step` / `drop_step` が 
 
 ## 学習 (PPO) をしなかった理由
 
-補助なしの成功率が 90% を下回る種類 (硬貨・電池・ブロック・ハサミ) があるので、手順 3 の条件の片方は満たす。ただし 2026-10-23 14:04 の時点で GPU は `pai_mujoco` の歩き方の学習 (Mjlab-Nobita-Clutter-Backlash-MicroDuck、11.6 GB 使用、あと 10 分ほど) が使っていたので始めていない。CPU で stable-baselines3 を使う案も、`.venv` に stable-baselines3 / gymnasium が入っておらず、入れると共有の `pyproject.toml` / `uv.lock` を変えることになるのでやめた。
+補助なしの成功率が 90% を下回る種類 (硬貨・電池・ブロック・ハサミ) があるので、手順 3 の条件の片方は満たす。ただし 2026-10-23 14:04 の時点で GPU は `pai_mujoco` の歩き方の学習 (Mjlab-Home-Clutter-Backlash-MicroDuck、11.6 GB 使用、あと 10 分ほど) が使っていたので始めていない。CPU で stable-baselines3 を使う案も、`.venv` に stable-baselines3 / gymnasium が入っておらず、入れると共有の `pyproject.toml` / `uv.lock` を変えることになるのでやめた。
 
 やるなら: 台車は固定、観測 = 物の位置の見積もり (±1 cm) + 腕・手首・指の関節、行動 = lift / arm / wrist_pitch / wrist_roll / gripper の目標の差分、報酬 = 物の高さ + 両指の接触 − 物の床へのめり込み、`learning/eval_pick.py` の `Env.reset` をそのまま乱数の場面に使う。ただし失敗の多くは数 g の物と柔らかい接触の性質 (押し出される・滑る) なので、学習がそれを乗り越えるより、シミュレーションの穴 (めり込み) を使う方策になるおそれがある。mjlab (MuJoCo Warp) で noslip が使えるかも確かめていない。

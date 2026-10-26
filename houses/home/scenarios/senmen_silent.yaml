@@ -1,0 +1,15 @@
+# 子どもが脱衣所へ行き、そこで倒れて返事をしない (のぼせた想定)。脱衣所にはカメラが無いので、人感センサーで長くいると分かり、
+# アヒルが扉の前で呼ぶ → 返事がないので中に入って姿勢だけを確かめ (絵は残さない)、保護者に連絡する
+name: senmen_silent
+description: 脱衣所で倒れた子どもが返事をしない (カメラの無い部屋)
+mode: alone
+duration: 160
+events:
+  - {t: 0, who: mama, at: outside}
+  - {t: 0, who: child, at: rouka_mid, pose: stand}
+  - {t: 0, door: ima, do: close}       # 居間のふすまは閉まっている (居間のカメラから廊下の奥は見えない)
+  - {t: 5, who: child, at: senmen, pose: stand, walk: true, speed: 0.6}
+  - {t: 20, who: child, at: senmen_fall, pose: lie}
+replies:
+  child:
+    default: null

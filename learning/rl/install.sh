@@ -7,9 +7,9 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 RL="${MICRODUCK_RL:-$HOME/ext/microduck_rl}"
 TASKS="$RL/src/mjlab_microduck/tasks"
 
-cp "$HERE/nobita_clutter_env_cfg.py" "$TASKS/nobita_clutter_env_cfg.py"
+cp "$HERE/home_clutter_env_cfg.py" "$TASKS/home_clutter_env_cfg.py"
 
-MARK="# --- PAI1-mujoco: nobita tasks (learning/rl/install.sh) ---"
+MARK="# --- PAI1-mujoco: home tasks (learning/rl/install.sh) ---"
 # 前に足した塊を消す (印の行から末尾まで)
 "$RL/.venv/bin/python" - "$TASKS/__init__.py" "$MARK" <<'EOF'
 import sys
@@ -22,18 +22,18 @@ EOF
 cat >> "$TASKS/__init__.py" <<EOF
 
 $MARK
-from .nobita_clutter_env_cfg import make_nobita_clutter_env_cfg, NobitaClutterRlCfg, NobitaClutter2RlCfg
+from .home_clutter_env_cfg import make_home_clutter_env_cfg, HomeClutterRlCfg, HomeClutter2RlCfg
 
 for _task_id, _version, _rl_cfg in (
-    ("Mjlab-Nobita-Clutter-Backlash-MicroDuck", 1, NobitaClutterRlCfg),
-    ("Mjlab-Nobita-Clutter2-Backlash-MicroDuck", 2, NobitaClutter2RlCfg),
+    ("Mjlab-Home-Clutter-Backlash-MicroDuck", 1, HomeClutterRlCfg),
+    ("Mjlab-Home-Clutter2-Backlash-MicroDuck", 2, HomeClutter2RlCfg),
 ):
     register_mjlab_task(
         task_id=_task_id,
-        env_cfg=make_backlash_variant(make_nobita_clutter_env_cfg(version=_version), _BL_WALK),
-        play_env_cfg=make_backlash_variant(make_nobita_clutter_env_cfg(play=True, version=_version), _BL_WALK),
+        env_cfg=make_backlash_variant(make_home_clutter_env_cfg(version=_version), _BL_WALK),
+        play_env_cfg=make_backlash_variant(make_home_clutter_env_cfg(play=True, version=_version), _BL_WALK),
         rl_cfg=_rl_cfg,
         runner_cls=MicroduckOnPolicyRunner,
     )
 EOF
-echo "registered Mjlab-Nobita-Clutter-Backlash-MicroDuck, Mjlab-Nobita-Clutter2-Backlash-MicroDuck"
+echo "registered Mjlab-Home-Clutter-Backlash-MicroDuck, Mjlab-Home-Clutter2-Backlash-MicroDuck"

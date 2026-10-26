@@ -1,7 +1,7 @@
 # おるすばんアヒル — IoT と歩くロボットが、ひとりで留守番する子どもを見守り・守り・遊ぶ家 (MuJoCo 版)
 
-Physical AI 応用編 1 最終課題。のび太君の家 (野比家) を間取り図から MuJoCo で作り、ママが出かけている間、
-のび太がひとりで留守番する家を、家の IoT 機器と二足歩行の小型ロボット (Pollen Robotics の Microduck、以下アヒル)、
+Physical AI 応用編 1 最終課題。2 階建ての日本家屋を間取り図から MuJoCo で作り、ママが出かけている間、
+子どもがひとりで留守番する家を、家の IoT 機器と二足歩行の小型ロボット (Pollen Robotics の Microduck、以下アヒル)、
 床の物を拾うロボット (Hello Robot の Stretch 3)、LLM が手分けして見守る。詳しい構成・確認手順・直したことは [PLAN.md](PLAN.md)。
 
 **できること (おるすばんモード)**
@@ -16,7 +16,7 @@ Physical AI 応用編 1 最終課題。のび太君の家 (野比家) を間取�
 5. **かくれんぼ**: アヒルが鬼になり、家の地図から「隠れられそうな所」を考えて探す (見守りカメラは使わない)
 
 **仕組み**
-- **家**: 間取り図を半間のマス目で読み取った `houses/nobita/layout.yaml` から MJCF を自動生成 (1 階・2 階、扉、窓、階段)
+- **家**: 間取り図を半間のマス目で読み取った `houses/home/layout.yaml` から MJCF を自動生成 (1 階・2 階、扉、窓、階段)
 - **ロボット**: Microduck (この家で強化学習した歩き方 + 転んだら公開の方策で起き上がる)、Stretch 3 (MuJoCo Menagerie)
 - **IoT**: 見守りカメラ (YOLO で人の位置と姿勢、マイク)、人感センサー、扉のセンサー、照明、スマートロック、スピーカー。Homie 4.0 で MQTT に出す
 - **ロボットへの指示**: VDA 5050 v2.0 (order / instantActions / state / factsheet)。アヒルと Stretch の 2 台
@@ -34,7 +34,7 @@ uv run python app/run_scenario.py --scenario fall --speed 0 --record build/video
 
 - 1 行目で Python の環境を作る（Windows / Linux）。
 - 2 行目で Microduck のモデルと学習済み方策を取ってくる。
-- 3 行目で場面を 1 回通す（場面は `houses/nobita/scenarios/`。おるすばんの場面は fall_ok / fall_hurt / fall_silent /
+- 3 行目で場面を 1 回通す（場面は `houses/home/scenarios/`。おるすばんの場面は fall_ok / fall_hurt / fall_silent /
   danger_stove / danger_genkan / danger_bath / senmen_silent / toilet_long / hazard_patrol / hide_sofa / hide_table / hide_cupboard）。
 - 全部の場面をまとめて確かめる: `uv run python app/check_scenarios.py --only <場面 ...>`
 - 転倒の判断に LLM を使う: `JUDGE_LLM=claude-code` (Claude Code の Pro などのプラン) か `JUDGE_LLM=api` (Claude API)。
@@ -54,5 +54,4 @@ uv run python app/run_scenario.py --scenario fall --speed 0 --record build/video
 - [Ultralytics YOLOv8](https://github.com/ultralytics/ultralytics) (AGPL-3.0)
 - [amqtt](https://github.com/Yakifo/amqtt) (MQTT ブローカー)、[paho-mqtt](https://github.com/eclipse/paho.mqtt.python)
 - 人のモデル: Gazebo の person_standing (MakeHuman 製)
-- 間取り: LIFULL HOME'S「ドラえもん・野比家の間取り」(https://www.homes.co.jp/cont/living/living_00324/)
 - W3C WoT TD 1.1 の JSON Schema (`wot_schemas/`)

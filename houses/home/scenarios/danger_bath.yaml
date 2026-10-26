@@ -1,0 +1,17 @@
+# 子どもが居間から脱衣所へ行き、服を脱いで、ひとりで浴室 (浴槽にお湯がある想定) へ入ろうとする。
+# 脱衣所と浴室にはカメラが無いので、廊下のカメラが見ているうちの先読みで、アヒルが浴室の扉の前へ先回りする
+name: danger_bath
+description: 子どもがひとりでお風呂に入ろうとする (先読みして止める)
+mode: alone
+duration: 120
+events:
+  - {t: 0, who: mama, at: outside}
+  - {t: 0, who: child, at: ima_center, pose: stand}
+  - {t: 10, who: child, at: senmen, pose: stand, walk: true, speed: 0.6}
+  - {t: 34, who: child, at: bath_front, pose: stand, walk: true, speed: 0.6, unless_stopped: true}
+react:
+  child: {on: warn, ignore: 0, delay: 1.0}
+replies:
+  child:
+    ask_ok: {say: "はーい。手をあらってるだけ", delay: 1.5}
+    default: null

@@ -2,7 +2,7 @@
 
 uv run python app/sim_server.py --scenario fall [--speed 1.0] [--viewer] [--record build/videos/fall.mp4]
 --speed: 実時間の何倍で進めるか (0 = できるだけ速く)
-MQTT: homie/... (家の機器)、uagv/v2/NobitaHome/microduck-01/... (アヒル)、home/time (シミュレーションの時刻)、
+MQTT: homie/... (家の機器)、uagv/v2/OrusubanHome/microduck-01/... (アヒル)、home/time (シミュレーションの時刻)、
       home/speech (アヒルの発話)、sim/scenario・sim/truth (評価用の正解。司令塔は使わない)
 """
 import argparse

@@ -18,8 +18,8 @@ import numpy as np
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 YOLO_WEIGHTS = os.path.join(ROOT, "third_party", "yolov8s.pt")              # 公開の YOLOv8s (COCO)
-FINETUNED_WEIGHTS = os.path.join(ROOT, "models", "yolo_nobita.pt")          # この家で追加学習したもの (2 クラス: 姿勢)
-WHO_WEIGHTS = os.path.join(ROOT, "models", "yolo_nobita_who.pt")            # 見分けも学習したもの (6 クラス: 見た目 × 姿勢)
+FINETUNED_WEIGHTS = os.path.join(ROOT, "models", "yolo_person.pt")          # この家で追加学習したもの (2 クラス: 姿勢)
+WHO_WEIGHTS = os.path.join(ROOT, "models", "yolo_person_who.pt")            # 見分けも学習したもの (6 クラス: 見た目 × 姿勢)
 # 環境変数 YOLO_WEIGHTS: 重みのファイル、または who (6 クラス) / posture (2 クラス) / coco (公開の YOLOv8s)
 WEIGHT_NAMES = {"who": WHO_WEIGHTS, "posture": FINETUNED_WEIGHTS, "coco": YOLO_WEIGHTS}
 POSTURES = {"standing", "lying"}
@@ -43,8 +43,8 @@ MIN_SCORE = 0.4
 
 
 class PersonDetector:
-    """weights=None なら、環境変数 YOLO_WEIGHTS、無ければ見分けも学習したモデル (models/yolo_nobita_who.pt)、
-    2 クラスのモデル (models/yolo_nobita.pt)、公開の YOLOv8s の順で、ある物を使う。
+    """weights=None なら、環境変数 YOLO_WEIGHTS、無ければ見分けも学習したモデル (models/yolo_person_who.pt)、
+    2 クラスのモデル (models/yolo_person.pt)、公開の YOLOv8s の順で、ある物を使う。
     追加学習したモデルはクラスで姿勢 (枠の 6 番目の値) を、6 クラスのモデルはだれか (7 番目) も返す。
     公開のモデルでは姿勢は幾何で決める。"""
 

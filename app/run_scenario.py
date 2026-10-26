@@ -28,7 +28,7 @@ def port_open(port=1883):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--scenario", default="fall")
-    ap.add_argument("--story", default=None, help="一続きの物語 (houses/nobita/stories/<名前>.yaml)")
+    ap.add_argument("--story", default=None, help="一続きの物語 (houses/home/stories/<名前>.yaml)")
     ap.add_argument("--speed", type=float, default=0.0)
     ap.add_argument("--record", default=None)
     ap.add_argument("--viewer", action="store_true")

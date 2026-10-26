@@ -4,7 +4,7 @@
   人役に聞こえる (同じ部屋か HEAR_RADIUS 以内、同じ階) なら、台本の返事を delay 秒後に home/voice に出す。
 - 台本の書き方 (場面の yaml):
     replies:
-      nobita:
+      child:
         ask_ok: {say: "いてて…でもへーき", delay: 2.0}
         ask_pain: [{say: "ひざがちょっといたい", delay: 1.5, then: {pose: stand}}, null]   # 1 回目と 2 回目
         default: null                                                                   # 書いていない問いは無言

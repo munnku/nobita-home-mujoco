@@ -50,7 +50,7 @@ class BlindSpot(Rule):
         x, y = (v * M for v in cfg["stand"])
         job = Job("blind", 1).go(x, y, 0.3)
         job.room, job.replies = room, []
-        job.say(f"のび太くん、{label}にいるの？だいじょうぶ？", intent="ask_ok").listen(LISTEN)
+        job.say(f"{label}にいるの？だいじょうぶ？", intent="ask_ok").listen(LISTEN)
         job.then(lambda j: self._heard(j, 1))
         c.add_job(job)
 
@@ -69,18 +69,18 @@ class BlindSpot(Rule):
             d = c.home["robot"]["dock"]
             nxt.go(d["x"] * M, d["y"] * M, 0.3)     # 扉の前から離れて待つ (出てきた子どもとぶつからない)
         elif lab in ("hurt", "help"):
-            v = judge_rules({"who": "のび太", "room": room, "room_label": label, "replies": j.replies,
+            v = judge_rules({"who": "子ども", "room": room, "room_label": label, "replies": j.replies,
                              "posture": None, "found": False})
-            self._alert(room, v["level"], f"のび太が{label}で「{text}」と言っています。{v['message_to_parent']}")
+            self._alert(room, v["level"], f"子どもが{label}で「{text}」と言っています。{v['message_to_parent']}")
             nxt.say("おうちの人に知らせたよ。")
         elif n == 1:
-            nxt.say("のび太くん！聞こえる？返事をして！", intent="ask_ok").listen(LISTEN)
+            nxt.say("ねえ、聞こえる？返事をして！", intent="ask_ok").listen(LISTEN)
             nxt.then(lambda j: self._heard(j, 2))
         else:
             door = self.cfg[room].get("door")
             if door and not c.door_open.get(door, True):      # 扉の開閉センサー (分からなければ開いているとみなす)
                 c.log(f"{label}から返事がなく、扉が閉まっていて入れない → 保護者に連絡", kind="blind_no_reply", room=room)
-                self._alert(room, "emergency", f"のび太が{label}にいますが、呼んでも返事がありません。扉が閉まっていて"
+                self._alert(room, "emergency", f"子どもが{label}にいますが、呼んでも返事がありません。扉が閉まっていて"
                                                "ロボットは入れません。すぐに連絡してください。")
                 nxt.say("おうちの人に連絡したよ。")
             else:
@@ -97,16 +97,16 @@ class BlindSpot(Rule):
         res = result_json(j.last[0] if j.last else None)
         if res.get("found") and res.get("posture") == "standing":
             c.log(f"{label}の中: 立っていた", kind="blind_standing", room=room)
-            self._alert(room, "warn", f"のび太が{label}で呼んでも返事をしませんが、立っています。様子を確かめてください。")
+            self._alert(room, "warn", f"子どもが{label}で呼んでも返事をしませんが、立っています。様子を確かめてください。")
             j.say("返事がなかったから心配したよ。")
         elif res.get("found"):
             c.log(f"{label}の中: 横になっている (score {res.get('score')}) → 保護者に連絡", kind="blind_lying", room=room)
-            self._alert(room, "emergency", f"のび太が{label}で倒れていて、呼んでも返事がありません。すぐに連絡してください。")
+            self._alert(room, "emergency", f"子どもが{label}で倒れていて、呼んでも返事がありません。すぐに連絡してください。")
             j.say("すぐにおうちの人に連絡したよ。")
         else:
             c.log(f"{label}の中に人が見えない → 保護者に連絡", kind="blind_not_found", room=room)
-            self._alert(room, "emergency", f"のび太が{label}にいるはずですが、返事がなく、ロボットにも見えません。")
-            j.say("のび太くん、どこ？")
+            self._alert(room, "emergency", f"子どもが{label}にいるはずですが、返事がなく、ロボットにも見えません。")
+            j.say("どこにいるの？")
 
     def _alert(self, room, level, summary):
         self.c.attended[room] = self.c.time

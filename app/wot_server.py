@@ -28,7 +28,7 @@ ROOMS = {"ima": "居間", "dk": "DK (台所と食堂)", "ousetsu": "応接室", 
          "genkan": "玄関 (の手前)"}
 SCHEMA = os.path.join(ROOT, "wot_schemas", "td-json-schema-validation.json")
 
-app = FastAPI(title="のび太君の家 WoT")
+app = FastAPI(title="おるすばんアヒルの家 WoT")
 mq = Mqtt(f"wot-server-{uuid.uuid4().hex[:6]}")
 cat = HomieCatalog(mq)
 results = {}

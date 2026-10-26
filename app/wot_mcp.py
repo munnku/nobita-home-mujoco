@@ -47,7 +47,7 @@ async def call_tool(ctx, params):
         return types.CallToolResult(content=[types.TextContent(type="text", text=f"error: {e}")], isError=True)
 
 
-server = Server("nobita-home", instructions=SYSTEM, on_list_tools=list_tools, on_call_tool=call_tool)
+server = Server("orusuban-home", instructions=SYSTEM, on_list_tools=list_tools, on_call_tool=call_tool)
 
 
 async def main():

@@ -1,13 +1,11 @@
-# のび太君の家 (野比家) の間取り。1 階と 2 階。
-# 出典: LIFULL HOME'S「ドラえもん・野比家の間取り」(https://www.homes.co.jp/cont/living/living_00324/) の
-#      2005 年以降の間取り図 (図の上を北とした)。
+# 2 階建ての日本家屋の間取り。1 階と 2 階 (図の上を北とした)。
 # 座標: 図を半間 (0.91 m) のマス目で読み取り、そのマス目の単位で書く。原点は建物の南西の角 (DK の西の壁の線と
 #      居間の南の壁の線の交点)、x が東、y が北。高さ (z, height) だけは m。
-# 確かめ: 居間 8 畳 = 4×4 マス (3.64 m 四方)、DK 10 畳 = 4×5 マス、応接室 6 畳 = 3×4 マス、のび太の部屋 6 畳 = 4×3 マス。
-#        1 階 78 マス + 2 階 23 マス = 約 83.6 m² ≈ 記事の推定床面積 83.83 m²。
+# 確かめ: 居間 8 畳 = 4×4 マス (3.64 m 四方)、DK 10 畳 = 4×5 マス、応接室 6 畳 = 3×4 マス、子ども部屋 6 畳 = 4×3 マス。
+#        1 階 78 マス + 2 階 23 マス = 約 83.6 m²。
 # このファイルから sim/house.py が MuJoCo の家 (MJCF) を作り、経路探索の地図もここから作る (二重管理しない)。
 
-name: nobita
+name: home
 module: 0.91
 wall_thickness: 0.12
 ground_z: -0.45          # 地面 (1 階の床は地面より 45 cm 高い)
@@ -26,9 +24,9 @@ rooms:
   - {name: yokushitsu, label: 浴室, level: 1F, rect: [4, 6, 6, 8], material: tile}
   - {name: senmen, label: 洗面脱衣, level: 1F, rect: [6, 8, 6, 8], material: vinyl}
   - {name: toilet, label: トイレ, level: 1F, rect: [8, 9, 6, 8], material: vinyl}
-  - {name: nobita, label: のび太の部屋, level: 2F, rect: [5, 9, 1, 4], material: tatami}
+  - {name: kodomo, label: 子ども部屋, level: 2F, rect: [5, 9, 1, 4], material: tatami}
   - {name: hall2, label: 2 階の廊下, level: 2F, rect: [4, 5, 0, 3.2], material: wood}
-  - {name: oshiire2, label: ドラえもんの寝床, level: 2F, rect: [6, 9, 0, 1], material: wood}
+  - {name: oshiire2, label: 押入れ, level: 2F, rect: [6, 9, 0, 1], material: wood}
   - {name: mono2, label: 物入, level: 2F, rect: [5, 6, 0, 1], material: wood}
 
 # 外 (見た目だけ)。z は 1 階の床からの高さ
@@ -64,16 +62,16 @@ walls:
   # ---- 2 階 外壁
   - {level: 2F, seg: [4, 0, 4, 5], windows: [[1.8, 3.2]]}                          # 2 階 西 (廊下の窓)
   - {level: 2F, seg: [4, 0, 9, 0]}                                                 # 2 階 南
-  - {level: 2F, seg: [9, 0, 9, 4], windows: [[1.6, 2.9]]}                          # のび太の部屋 東 (机の前の窓)
-  - {level: 2F, seg: [7, 4, 9, 4], windows: [[7.15, 8.5]]}                         # のび太の部屋 北
+  - {level: 2F, seg: [9, 0, 9, 4], windows: [[1.6, 2.9]]}                          # 子ども部屋 東 (机の前の窓)
+  - {level: 2F, seg: [7, 4, 9, 4], windows: [[7.15, 8.5]]}                         # 子ども部屋 北
   - {level: 2F, seg: [4, 5, 7, 5]}                                                 # 階段の北
   - {level: 2F, seg: [7, 4, 7, 5]}                                                 # 階段の東
   # ---- 2 階 内壁
-  - {level: 2F, seg: [5, 1, 5, 4], openings: [{at: [2.35, 3.15], door: nobita}]}   # 廊下 / のび太の部屋
-  - {level: 2F, seg: [5, 4, 7, 4]}                                                 # 階段 / のび太の部屋
+  - {level: 2F, seg: [5, 1, 5, 4], openings: [{at: [2.35, 3.15], door: kodomo}]}   # 廊下 / 子ども部屋
+  - {level: 2F, seg: [5, 4, 7, 4]}                                                 # 階段 / 子ども部屋
   - {level: 2F, seg: [5, 1, 9, 1]}                                                 # 部屋 / 押入 (ふすま)
   - {level: 2F, seg: [5, 0, 5, 1]}                                                 # 廊下 / 物入
-  - {level: 2F, seg: [6, 0, 6, 1]}                                                 # 物入 / ドラえもんの寝床
+  - {level: 2F, seg: [6, 0, 6, 1]}                                                 # 物入 / 押入れ
 
 # 扉。hinge: 開き戸 (hinge_at = 軸のある端 from/to、swing = 開く側 +1/-1 (+1 は線分の左側)、open = 開いた角度 [deg])
 #      slide: 引き戸 (開くと壁の中へ引き込む)
@@ -87,7 +85,7 @@ doors:
   yokushitsu: {type: slide, state: open}
   ima: {type: slide, state: open}          # ふすま
   ousetsu: {type: hinge, hinge_at: from, swing: -1, open: 95, state: open}
-  nobita: {type: hinge, hinge_at: to, swing: -1, open: 95, state: open}
+  kodomo: {type: hinge, hinge_at: to, swing: -1, open: 95, state: open}
 
 # 階段 (1 階の廊下の東の端から西へ上がり、西の端で南へ折れて 2 階の廊下へ)。
 # 見た目と当たり判定だけ (アヒルは上れない)。各段は下まで詰まった箱 (solid) か、厚さ 0.2 m の板
@@ -127,10 +125,10 @@ furniture:
   - {level: 1F, name: washbasin, rect: [6.1, 6.95, 7.3, 7.9], height: 0.85, color: white}
   - {level: 1F, name: washer, rect: [7.2, 7.9, 7.2, 7.9], height: 0.9, color: white}
   - {level: 1F, name: toilet_bowl, rect: [8.25, 8.8, 7.2, 7.85], height: 0.4, color: white}
-  # 2 階 のび太の部屋
+  # 2 階 子ども部屋
   - {level: 2F, name: desk, rect: [8.35, 8.95, 1.7, 3.0], height: 0.72, color: wood}           # 東の窓の前の机
   - {level: 2F, name: bookcase, rect: [5.05, 7.0, 3.5, 3.95], height: 0.9, color: wood}         # 北の壁沿いの本棚
-  - {level: 2F, name: closet_shelf, rect: [6.05, 8.95, 0.05, 0.95], height: 0.05, z0: 0.8, color: wood}  # ドラえもんの寝床の中段
+  - {level: 2F, name: closet_shelf, rect: [6.05, 8.95, 0.05, 0.95], height: 0.05, z0: 0.8, color: wood}  # 押入れの中段
 
 # 1 階の天井 (2 階の床の下と階段の吹き抜けを除く) と屋根 [マス]。見下ろしで見るときは隠す
 ceilings:
@@ -138,4 +136,4 @@ ceilings:
   2F: [[4, 9, 0, 4], [4, 7, 4, 5]]
 
 # 照明 (部屋の名前)。MuJoCo の描画は 8 灯までなので、太陽を入れて 8 灯にする
-lights: [dk, rouka, genkan, ima, ousetsu, senmen, nobita]
+lights: [dk, rouka, genkan, ima, ousetsu, senmen, kodomo]

@@ -1,0 +1,15 @@
+# 子どもがひとりで留守番中に居間で転ぶ。アヒルが声をかけると「へーき」と言って起き上がる → info (様子だけ知らせる)
+name: fall_ok
+description: 居間で転んだ子どもが「へーき」と言って起き上がる
+duration: 200
+events:
+  - {t: 0, who: mama, at: outside}
+  - {t: 0, who: child, at: rouka_mid, pose: stand}
+  - {t: 8, who: child, at: ima_center, pose: stand, walk: true}
+  - {t: 20, who: child, at: ima_fall, pose: lie}
+  - {t: 20.5, who: child, say: "いたっ！"}
+replies:
+  child:
+    ask_ok: {say: "いてて…ころんじゃった。でもへーきだよ", delay: 2.0, then: {pose: stand}}
+    ask_pain: {say: "ううん、どこもいたくない", delay: 1.5}
+    default: null
