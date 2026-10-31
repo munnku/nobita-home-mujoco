@@ -33,9 +33,6 @@ places:
   senmen_fall: {x: 6.15, y: 6.6, yaw: 0, level: 1F}    # 脱衣所で倒れる (洗面台・洗濯機の手前。廊下のカメラから見えない)
   toilet_door: {x: 8.5, y: 5.4, yaw: 90, level: 1F}    # トイレの扉の前 (廊下)
   toilet_in: {x: 8.5, y: 6.7, yaw: -90, level: 1F}     # トイレの中
-  hide_sofa: {x: 9.4, y: 0.45, yaw: 0, level: 1F}      # かくれんぼ: 応接室のソファの南に伏せる
-  hide_table: {x: 2.27, y: 2.4, yaw: 90, level: 1F}    # かくれんぼ: DK の食卓の下にもぐる
-  hide_cupboard: {x: 3.15, y: 2.15, yaw: 0, level: 1F}  # かくれんぼ: DK の食器棚の西に立つ
 
 # 布団 (ここで横になっているのは寝ているので転倒としない)。rect [xmin, xmax, ymin, ymax] (マス)
 bed: {room: kodomo, rect: [5.6, 8.3, 1.4, 2.8]}

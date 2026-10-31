@@ -113,7 +113,7 @@ dl.terms dd { margin: 0; color: var(--ink); }
 
 <main>
 <header class="top">
-  <div class="eyebrow">PAI1-mujoco ・ 2026-10-19 の実装</div>
+  <div class="eyebrow">PAI1-mujoco ・ 2026-10-19 の実装 (そのあとの見守り・防犯への絞り込みは README と PLAN.md)</div>
   <h1>おるすばんアヒルのしくみ</h1>
   <p>MuJoCo の中のこの家で、見守りカメラなどの家の機器と、二足歩行の小さなロボット (アヒル) と、LLM が手分けして家族を見守る。その中身を、部品ごとに「何をしているか・どう動くか・なぜそうなっているか」で説明する。各節の終わりに、自分で動かして確かめる方法を書いた。</p>
 </header>
@@ -346,9 +346,7 @@ homie/cam-ima/camera/persons          [{"x":5.8,"y":1.2,"posture":"lying",...}]<
   <div class="scroll"><table>
     <tr><th>決まりごと</th><th>見るもの</th><th>すること</th></tr>
     <tr><td>転倒</td><td>見守りカメラの「横になった人」</td><td>3 秒続いたら照明をつけ、アヒルに確かめさせ、結果で知らせる / 取り消す。寝室の布団の人は除く。</td></tr>
-    <tr><td>起床</td><td>家の時計 (7:00) と、子ども部屋のカメラ</td><td>布団で寝ていたら、部屋の照明とスピーカー、アヒルが階段の下から呼ぶ。30 秒ごとにもう一度、それでも起きなければママ (1 階で立っている人) に知らせに行く。起きたら取り消す。</td></tr>
     <tr><td>玄関</td><td>鍵と扉の開閉センサー</td><td>扉が開いたらアヒルが見に行き、人がいれば「おかえりなさい」。閉まって 20 秒鍵が開いたままなら施錠。</td></tr>
-    <tr><td>照明</td><td>人感センサーと照明</td><td>だれもいない部屋の照明を 60 秒で消す。人が来たらつける。</td></tr>
     <tr><td>依頼</td><td><code>home/coordinator/requests</code></td><td>WoT (LLM) からの「部屋へ行く・部屋を確かめる・戻る」を仕事にし、終わったら結果を返す。</td></tr>
   </table></div>
   <p>仕事は「行く (order を出す)」「話す (instantActions)」「関数を呼ぶ」の手順の列。「行く」では order の最後に短い <code>wait</code> を付けておき、それが FINISHED になったら次の手順へ進む。</p>

@@ -1,8 +1,8 @@
 build/
-assets/person/
 __pycache__/
 *.pt
 third_party/
 .venv/
 !models/yolo_person.pt
 runs/
+MUJOCO_LOG.TXT

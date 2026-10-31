@@ -46,6 +46,18 @@ Physical AI 応用編 1 最終課題。2 階建ての日本家屋を間取り図
 - **学習**: MuJoCo で正解付きの画像を自動で作り、YOLOv8 を追加学習 (人: 子ども・家の大人・知らない大人 × 立つ・横になる、床の物)。
   歩き方の強化学習 (mjlab、平らな床 / 散らかった床と押し)
 
+## 結果
+
+| 確かめたこと | 結果 |
+|---|---|
+| 全 24 場面 (規則だけ、`check_scenarios.py --only all`) | ALL PASS |
+| 人の YOLO (テスト 888 人) | 見つけた 97.6%、姿勢 97.2%、だれか 97.2% |
+| 床の物の YOLO | mAP50 0.964 |
+| 常時マイクの声の判断 (22 例、`tests/test_brain.py --llm`) | LLM 21 例、規則 14 例 |
+| 歩き方の強化学習 (0.4 m/s の指令で進む速さ) | 公開の方策 0.14 m/s → 学習後 0.34 m/s |
+
+Stretch 3 のビー玉の拾い方は安定していない。見回りの場面で 3 個とも見つけたが、最後の確認で片付けたのは 2 個だった (拾えなければ保護者に知らせる)。
+
 ## 動かし方
 
 ```bash
@@ -55,7 +67,7 @@ uv run python app/run_scenario.py --scenario fall_ok --speed 0 --record build/vi
 ```
 
 - 1 行目で Python の環境を作る（Windows / Linux）。
-- 2 行目で Microduck のモデルと学習済み方策を取ってくる。
+- 2 行目で Microduck・Stretch 3 のモデルと学習済み方策を取ってくる。
 - 3 行目で場面を 1 回通す。場面は `houses/home/scenarios/` にある。
   - 転倒: fall_ok / fall_hurt / fall_silent
   - 先読み: danger_stove / danger_genkan / danger_bath
@@ -86,5 +98,5 @@ uv run python app/run_scenario.py --scenario fall_ok --speed 0 --record build/vi
 - Claude (Anthropic)。Claude Code の `claude -p` か Claude API で、声の判断・対話・知らせの重さに使う
 - [Ultralytics YOLOv8](https://github.com/ultralytics/ultralytics) (AGPL-3.0)
 - [amqtt](https://github.com/Yakifo/amqtt) (MQTT ブローカー)、[paho-mqtt](https://github.com/eclipse/paho.mqtt.python)
-- 人のモデル: Gazebo の person_standing (MakeHuman 製)
+- 人のモデル: [osrf/gazebo_models](https://github.com/osrf/gazebo_models) の person_standing (MakeHuman 製、作者 Marina Kollmitz、CC BY 3.0。`assets/person/` に変換して同梱し、色と大きさを変えて使う)
 - W3C WoT TD 1.1 の JSON Schema (`wot_schemas/`)

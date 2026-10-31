@@ -35,7 +35,7 @@ VISITOR_FORBID = re.compile(r"(ひとり|一人|留守|るすばん|子ども|�
 
 
 def llm_mode():
-    return os.environ.get("BRAIN_LLM", os.environ.get("JUDGE_LLM", ""))
+    return os.environ.get("BRAIN_LLM", "")
 
 
 # ---- 言葉の手がかり (規則)

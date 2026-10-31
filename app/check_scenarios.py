@@ -1,6 +1,6 @@
 """場面を順に通して、合格の目安を満たすか確かめる (PLAN.md の確認手順)。
 
-uv run python app/check_scenarios.py [--only fall morning] [--repeat 3]
+uv run python app/check_scenarios.py [--only fall fall_ok | --only all] [--repeat 3]
 各場面の結果 (PASS / FAIL と理由、かかった時間) を表にして、build/runs/check_<時刻>.md に残す。
 """
 import argparse
@@ -262,6 +262,7 @@ def main():
     for name in (ALL if a.only == ["all"] else a.only):
         for k in range(a.repeat):
             before = set(glob.glob(os.path.join(ROOT, "build", "runs", f"{name}_*.json")))
+            os.makedirs(os.path.join(ROOT, "build", "runs"), exist_ok=True)
             log = os.path.join(ROOT, "build", "runs", f"{name}_{datetime.datetime.now():%Y%m%d_%H%M%S}.log")
             with open(log, "w", encoding="utf-8") as lf:     # 司令塔・シミュレーションの出力 (うまくいかなかったときに見る)
                 subprocess.run([PY, os.path.join(ROOT, "app", "run_scenario.py"),
